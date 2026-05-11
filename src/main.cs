@@ -5,6 +5,11 @@ class Program
         while (true) {
             Console.Write("$ ");
             string command = Console.ReadLine();
+            
+            if(command.StartsWith("echo ")) {
+                Console.WriteLine(command.Substring(5));
+            }
+
             if (command.Equals("exit")) {
                 break;
             }
