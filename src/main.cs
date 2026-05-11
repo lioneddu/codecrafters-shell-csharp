@@ -1,20 +1,34 @@
 class Program
 {
-    static void Main()
-    {
-        while (true) {
-            Console.Write("$ ");
-            string command = Console.ReadLine();
-            
-            if(command.StartsWith("echo ")) {
-                Console.WriteLine(command.Substring(5));
-                continue;
-            }
+	static void Main()
+	{
+		while (true) {
+			Console.Write("$ ");
+			string command = Console.ReadLine();
 
-            if (command.Equals("exit")) {
-                break;
-            }
-            Console.WriteLine($"{command}: command not found");
-        }
+			if (command.StartsWith("echo ")) {
+				Console.WriteLine(command.Substring(5));
+				continue;
+			}
+
+			if (command == "type") {
+				string specifiedCommand = command.Split(" ")[1];
+				string[] builtInCommands = ["echo", "exit", "type"];
+
+				if (builtInCommands.Contains(specifiedCommand)) {
+					Console.WriteLine($"'{specifiedCommand}' is a shell builtin");
+				}
+				else {
+					Console.WriteLine($"{command}: command not found");
+				}
+
+				continue;
+			}
+
+			if (command.Equals("exit")) {
+				break;
+			}
+			Console.WriteLine($"{command}: command not found");
+		}
 	}
 }
