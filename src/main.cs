@@ -16,7 +16,7 @@ class Program
 				string[] builtInCommands = new string[] { "echo", "exit", "type" };
 				
 				if (builtInCommands.Contains(specifiedCommand.Trim())) {
-					Console.WriteLine($"'{specifiedCommand}' is a shell builtin");
+					Console.WriteLine($"{specifiedCommand} is a shell builtin");
 				}
 				else {
 					Console.WriteLine($"{specifiedCommand}: command not found");
