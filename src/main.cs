@@ -8,6 +8,7 @@ class Program
             
             if(command.StartsWith("echo ")) {
                 Console.WriteLine(command.Substring(5));
+                continue;
             }
 
             if (command.Equals("exit")) {
