@@ -19,7 +19,7 @@ class Program
 					Console.WriteLine($"{specifiedCommand} is a shell builtin");
 				}
 				else {
-					Console.WriteLine($"{specifiedCommand}: command not found");
+					Console.WriteLine($"{specifiedCommand}: not found");
 				}
 
 				continue;
