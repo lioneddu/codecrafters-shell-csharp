@@ -6,15 +6,16 @@ class Program
 			Console.Write("$ ");
 			string command = Console.ReadLine();
 
-			if (command.StartsWith("echo ")) {
+			if (command.StartsWith("echo")) {
 				Console.WriteLine(command.Substring(5));
 				continue;
 			}
 
 			if (command == "type") {
 				string specifiedCommand = command.Split(" ")[1];
-				string[] builtInCommands = ["echo", "exit", "type"];
-
+				Console.WriteLine($"Checking if '{specifiedCommand}' is a shell builtin...");
+				string[] builtInCommands = new string[] { "echo", "exit", "type" };
+				
 				if (builtInCommands.Contains(specifiedCommand.Trim())) {
 					Console.WriteLine($"'{specifiedCommand}' is a shell builtin");
 				}
