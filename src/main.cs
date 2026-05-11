@@ -15,11 +15,11 @@ class Program
 				string specifiedCommand = command.Split(" ")[1];
 				string[] builtInCommands = ["echo", "exit", "type"];
 
-				if (builtInCommands.Contains(specifiedCommand)) {
+				if (builtInCommands.Contains(specifiedCommand.Trim())) {
 					Console.WriteLine($"'{specifiedCommand}' is a shell builtin");
 				}
 				else {
-					Console.WriteLine($"{command}: command not found");
+					Console.WriteLine($"{specifiedCommand}: command not found");
 				}
 
 				continue;
