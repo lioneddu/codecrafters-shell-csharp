@@ -24,7 +24,7 @@ class Program
 					try {
 						string directory = Environment.GetEnvironmentVariable(specifiedCommand.Trim());
 
-						if (string.IsNullOrEmpty(directory)) {
+						if (!string.IsNullOrEmpty(directory)) {
 							Console.WriteLine($"{specifiedCommand}: is {directory}");
 						}
 						else {
