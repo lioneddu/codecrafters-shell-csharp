@@ -42,7 +42,7 @@ class Program
 				Console.WriteLine($"{command}: command not found");
 			}
 			else {
-				Process.Start(commandPath, args.Skip(1).ToArray());
+				Process.Start(commandPath, args.ToArray());
 			}
 
 			if (command.Equals("exit")) {
