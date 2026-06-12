@@ -42,8 +42,7 @@ class Program
 				Console.WriteLine($"{command}: command not found");
 			}
 			else {
-				Console.WriteLine($"Executing {commandPath} with arguments: {string.Join(' ', args)}");
-				Process.Start(commandPath, args);
+				Process.Start(commandName, args[1..]).WaitForExit();
 			}
 
 			if (command.Equals("exit")) {
