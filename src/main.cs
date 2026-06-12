@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Security;
 
 class Program
@@ -22,14 +23,23 @@ class Program
 				}
 				else {
 					try {
-						string directory = Environment.GetEnvironmentVariable(specifiedCommand.Trim());
 
-						if (!string.IsNullOrEmpty(directory)) {
-							Console.WriteLine($"{specifiedCommand}: is {directory}");
+						foreach (DictionaryEntry de in Environment.GetEnvironmentVariables()) {
+							Console.WriteLine($"{de.Key}={de.Value}");
+							string environmentVariablePath = Path.GetFileName(de.Key.ToString());
+							if (File.Exists(environmentVariablePath)) {
+								Console.WriteLine($"{specifiedCommand}: is {environmentVariablePath}");
+								break;
+							}
+							else {
+								continue;
+							}
+
 						}
-						else {
-							Console.WriteLine($"{specifiedCommand}: not found");
-						}
+
+
+						Console.WriteLine($"{specifiedCommand}: not found");
+						break;
 
 					}
 					catch (SecurityException exception) {
