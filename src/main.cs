@@ -40,12 +40,14 @@ class Program
 			string commandPath = _FindCommandInPath(commandName);
 			if (!string.IsNullOrEmpty(commandPath)) {
 				Process.Start(commandName, args[1..]).WaitForExit();
+			} else {
+				Console.WriteLine($"{command}: command not found");
 			}
 
 			if (command.Equals("exit")) {
 				break;
 			}
-			Console.WriteLine($"{command}: command not found");
+			
 		}
 
 	}
