@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security;
 
 class Program
@@ -21,40 +22,64 @@ class Program
 					Console.WriteLine($"{specifiedCommand} is a shell builtin");
 				}
 				else {
-					try {
-
-						string path = Environment.GetEnvironmentVariable("PATH");
-						bool isFound = false;
-						if (!string.IsNullOrEmpty(path)) {
-
-							foreach (string dir in path.Split(':')) {
-								string fullPath = Path.Combine(dir, specifiedCommand);
-								if (File.Exists(fullPath) && File.GetUnixFileMode(fullPath).HasFlag(UnixFileMode.UserExecute)) {
-									isFound = true;
-									Console.WriteLine($"{specifiedCommand} is {fullPath}");
-									break;
-								}
-							}
-
-							if (!isFound) {
-								Console.WriteLine($"{specifiedCommand}: not found");
-							}
-
-						}
-
-					}
-					catch (SecurityException exception) {
+					string commandPath = _FindCommandInPath(specifiedCommand);
+					if (string.IsNullOrEmpty(commandPath)) {
 						Console.WriteLine($"{specifiedCommand}: not found");
+					}
+					else {
+						Console.WriteLine($"{specifiedCommand} is {commandPath}");
 					}
 				}
 
 				continue;
 			}
 
+			// real command management
+			string[] args = command.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			string commandName = args[0];
+			string commandPath = _FindCommandInPath(commandName);
+			if (string.IsNullOrEmpty(commandPath)) {
+				Console.WriteLine($"{command}: command not found");
+			}
+			else {
+				Process.Start(commandPath, args.Skip(1).ToArray());
+			}
+
 			if (command.Equals("exit")) {
 				break;
 			}
 			Console.WriteLine($"{command}: command not found");
+		}
+
+	}
+
+
+	private static string _FindCommandInPath(string specifiedCommand)
+	{
+		try {
+
+			string path = Environment.GetEnvironmentVariable("PATH");
+			bool isFound = false;
+			if (!string.IsNullOrEmpty(path)) {
+
+				foreach (string dir in path.Split(':')) {
+					string fullPath = Path.Combine(dir, specifiedCommand);
+					if (File.Exists(fullPath) && File.GetUnixFileMode(fullPath).HasFlag(UnixFileMode.UserExecute)) {
+						isFound = true;
+						return fullPath;
+					}
+				}
+
+				if (!isFound) {
+					return string.Empty;
+				}
+
+			}
+
+			return string.Empty;
+		}
+		catch (SecurityException exception) {
+			return string.Empty;
 		}
 	}
 }
