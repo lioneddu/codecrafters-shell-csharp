@@ -25,7 +25,7 @@ class Program
 					try {
 
 						foreach (DictionaryEntry de in Environment.GetEnvironmentVariables()) {
-							Console.WriteLine($"{de.Key}={de.Value}");
+							//Console.WriteLine($"{de.Key}={de.Value}");
 							string environmentVariablePath = Path.GetFileName(de.Key.ToString());
 							if (File.Exists(environmentVariablePath)) {
 								Console.WriteLine($"{specifiedCommand}: is {environmentVariablePath}");
