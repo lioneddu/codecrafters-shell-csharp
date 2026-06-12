@@ -38,10 +38,7 @@ class Program
 			string[] args = command.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
 			string commandName = args[0];
 			string commandPath = _FindCommandInPath(commandName);
-			if (string.IsNullOrEmpty(commandPath)) {
-				Console.WriteLine($"{command}: command not found");
-			}
-			else {
+			if (!string.IsNullOrEmpty(commandPath)) {
 				Process.Start(commandName, args[1..]).WaitForExit();
 			}
 
