@@ -22,12 +22,12 @@ class Program
 					Console.WriteLine($"{specifiedCommand} is a shell builtin");
 				}
 				else {
-					string commandPath = _FindCommandInPath(specifiedCommand);
-					if (string.IsNullOrEmpty(commandPath)) {
+					string path = _FindCommandInPath(specifiedCommand);
+					if (string.IsNullOrEmpty(path)) {
 						Console.WriteLine($"{specifiedCommand}: not found");
 					}
 					else {
-						Console.WriteLine($"{specifiedCommand} is {commandPath}");
+						Console.WriteLine($"{specifiedCommand} is {path}");
 					}
 				}
 
