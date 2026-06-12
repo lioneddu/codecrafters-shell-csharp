@@ -29,7 +29,7 @@ class Program
 
 							foreach (string dir in path.Split(':')) {
 								string fullPath = Path.Combine(dir, specifiedCommand);
-								if (File.Exists(fullPath)) {
+								if (File.Exists(fullPath) && File.GetUnixFileMode(fullPath).HasFlag(UnixFileMode.UserExecute)) {
 									isFound = true;
 									Console.WriteLine($"{specifiedCommand} is {fullPath}");
 									break;
