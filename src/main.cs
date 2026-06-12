@@ -34,6 +34,10 @@ class Program
 				continue;
 			}
 
+			if (command.Equals("exit")) {
+				break;
+
+			}
 			// real command management
 			string[] args = command.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
 			string commandName = args[0];
@@ -43,11 +47,7 @@ class Program
 			} else {
 				Console.WriteLine($"{command}: command not found");
 			}
-
-			if (command.Equals("exit")) {
-				break;
-			}
-			
+	
 		}
 
 	}
