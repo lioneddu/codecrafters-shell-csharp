@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security;
+using System.Text;
 
 class Program
 {
@@ -11,8 +12,8 @@ class Program
 
 			if (command.StartsWith("echo")) {
 				string echoArguments = command.Substring(5);
-				bool isInSingleQuotes = echoArguments.StartsWith("'") && echoArguments.EndsWith("'");
-				Console.WriteLine(isInSingleQuotes ? echoArguments.Substring(1, echoArguments.Length - 2) : echoArguments);
+				
+				Console.WriteLine(_ParseEchoArguments(echoArguments));
 				continue;
 			}
 
@@ -78,6 +79,35 @@ class Program
 
 	}
 
+	private static string _ParseEchoArguments(string echoArguments)
+	{
+		var args = new List<string>();
+		var current = new StringBuilder();
+
+		bool inSingleQuotes = false;
+
+		foreach (char c in echoArguments) {
+			if (c == '\'') {
+				inSingleQuotes = !inSingleQuotes;
+				continue;
+			}
+
+			if (!inSingleQuotes && char.IsWhiteSpace(c)) {
+				if (current.Length > 0) {
+					args.Add(current.ToString());
+					current.Clear();
+				}
+				continue;
+			}
+
+			current.Append(c);
+		}
+
+		if (current.Length > 0)
+			args.Add(current.ToString());
+
+		return string.Join(" ", args);
+	}
 
 	private static string _FindCommandInPath(string specifiedCommand)
 	{
