@@ -34,6 +34,11 @@ class Program
 				continue;
 			}
 
+			if(command.StartsWith("pwd")) {
+				Console.WriteLine(Directory.GetCurrentDirectory());
+				continue;
+			}
+
 			if (command.Equals("exit")) {
 				break;
 
