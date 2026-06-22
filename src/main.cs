@@ -16,7 +16,7 @@ class Program
 
 			if (command.StartsWith("type")) {
 				string specifiedCommand = command.Split(" ")[1];
-				string[] builtInCommands = new string[] { "echo", "exit", "type", "pwd" };
+				string[] builtInCommands = new string[] { "echo", "exit", "type", "pwd", "cd" };
 
 				if (builtInCommands.Contains(specifiedCommand.Trim())) {
 					Console.WriteLine($"{specifiedCommand} is a shell builtin");
@@ -34,10 +34,25 @@ class Program
 				continue;
 			}
 
-			if(command.StartsWith("pwd")) {
+			if (command.StartsWith("pwd")) {
 				Console.WriteLine(Directory.GetCurrentDirectory());
 				continue;
 			}
+
+			if (command.StartsWith("cd")) {
+				string[] cdArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+				if (cdArgs.Length > 1) {
+					if(Directory.Exists(cdArgs[1])) {
+						Directory.SetCurrentDirectory(cdArgs[1]);
+					}
+					else {
+						Console.WriteLine($"cd: {cdArgs[1]}: No such file or directory");
+					}
+				}
+
+				continue;
+			}
+
 
 			if (command.Equals("exit")) {
 				break;
@@ -49,10 +64,11 @@ class Program
 			string commandPath = _FindCommandInPath(commandName);
 			if (!string.IsNullOrEmpty(commandPath)) {
 				Process.Start(commandName, args[1..]).WaitForExit();
-			} else {
+			}
+			else {
 				Console.WriteLine($"{command}: command not found");
 			}
-	
+
 		}
 
 	}
