@@ -69,7 +69,7 @@ class Program
 			string commandName = args[0];
 			string commandPath = _FindCommandInPath(commandName);
 			if (!string.IsNullOrEmpty(commandPath)) {
-				Process.Start(commandName, args[1..]).WaitForExit();
+				Process.Start(commandName, _ParseEchoArguments(string.Join(" ", args[1..]))).WaitForExit();
 			}
 			else {
 				Console.WriteLine($"{command}: command not found");
