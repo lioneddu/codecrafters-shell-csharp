@@ -42,7 +42,10 @@ class Program
 			if (command.StartsWith("cd")) {
 				string[] cdArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 				if (cdArgs.Length > 1) {
-					if(Directory.Exists(cdArgs[1])) {
+					if (cdArgs[1] == "~") {
+						Directory.SetCurrentDirectory(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+					}
+					else if (Directory.Exists(cdArgs[1])) {
 						Directory.SetCurrentDirectory(cdArgs[1]);
 					}
 					else {
