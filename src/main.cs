@@ -16,7 +16,7 @@ class Program
 
 			if (command.StartsWith("type")) {
 				string specifiedCommand = command.Split(" ")[1];
-				string[] builtInCommands = new string[] { "echo", "exit", "type" };
+				string[] builtInCommands = new string[] { "echo", "exit", "type", "pwd" };
 
 				if (builtInCommands.Contains(specifiedCommand.Trim())) {
 					Console.WriteLine($"{specifiedCommand} is a shell builtin");
