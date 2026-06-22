@@ -10,7 +10,9 @@ class Program
 			string command = Console.ReadLine();
 
 			if (command.StartsWith("echo")) {
-				Console.WriteLine(command.Substring(5));
+				string echoArguments = command.Substring(5);
+				bool isInSingleQuotes = echoArguments.StartsWith("'") && echoArguments.EndsWith("'");
+				Console.WriteLine(isInSingleQuotes ? echoArguments.Substring(1, echoArguments.Length - 2) : echoArguments);
 				continue;
 			}
 
