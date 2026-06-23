@@ -14,36 +14,55 @@ class Program
 				string echoArguments = command.Substring(5);
 				var arguments = _ParseArguments(echoArguments);
 
-				int stdoutRedirect = arguments.IndexOf(">");
-				if (stdoutRedirect == -1)
-					stdoutRedirect = arguments.IndexOf("1>");
+				RedirectMode stdoutMode = RedirectMode.None;
+				RedirectMode stderrMode = RedirectMode.None;
 
-				int stderrRedirect = arguments.IndexOf("2>");
+				string stdoutFile = string.Empty;
+				string stderrFile = string.Empty;
 
-				string output = string.Empty;
+				var echoArgs = new List<string>();
 
-				int stopIndex = arguments.Count;
+				for (int i = 0; i < arguments.Count; i++) {
+					string arg = arguments[i];
 
-				if (stdoutRedirect >= 0)
-					stopIndex = Math.Min(stopIndex, stdoutRedirect);
+					if (arg == ">" || arg == "1>") {
+						stdoutMode = RedirectMode.Overwrite;
+						stdoutFile = arguments[++i];
+						continue;
+					}
 
-				if (stderrRedirect >= 0)
-					stopIndex = Math.Min(stopIndex, stderrRedirect);
+					if (arg == ">>" || arg == "1>>") {
+						stdoutMode = RedirectMode.Append;
+						stdoutFile = arguments[++i];
+						continue;
+					}
 
-				output = string.Join(" ", arguments.Take(stopIndex));
+					if (arg == "2>") {
+						stderrMode = RedirectMode.Overwrite;
+						stderrFile = arguments[++i];
+						continue;
+					}
 
-				if (stdoutRedirect >= 0) {
-					string fileName = arguments[stdoutRedirect + 1];
-					File.WriteAllText(fileName, output + "\n");
+					if (arg == "2>>") {
+						stderrMode = RedirectMode.Append;
+						stderrFile = arguments[++i];
+						continue;
+					}
+
+					echoArgs.Add(arg);
+				}
+
+				string output = string.Join(" ", echoArgs) + "\n";
+
+				if (stdoutMode == RedirectMode.None) {
+					Console.Write(output);
 				}
 				else {
-					Console.WriteLine(output);
+					_WriteOutput(output, stdoutMode, stdoutFile);
 				}
 
-				if (stderrRedirect >= 0) {
-					string fileName = arguments[stderrRedirect + 1];
-
-					File.WriteAllText(fileName, string.Empty);
+				if (stderrMode != RedirectMode.None) {
+					_WriteOutput(string.Empty, stderrMode, stderrFile);
 				}
 
 				continue;
