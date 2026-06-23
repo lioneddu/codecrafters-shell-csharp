@@ -109,7 +109,7 @@ class Program
 		if (current.Length > 0)
 			args.Add(current.ToString());
 
-		return args;
+		return string.Join(" ", args);
 	}
 
 	private static string _FindCommandInPath(string specifiedCommand)
