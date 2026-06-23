@@ -156,9 +156,8 @@ class Program
 				string error = process.StandardError.ReadToEnd();
 				process.WaitForExit();
 
-				if (!string.IsNullOrEmpty(outputFilename)) {
-					_WriteOutput(output, stdoutMode, outputFilename);
-				}
+				_WriteOutput(output, stdoutMode, outputFilename);
+
 
 				if (stderrMode != RedirectMode.None && !string.IsNullOrEmpty(errorFilename)) {
 					_WriteOutput(error, stderrMode, errorFilename);
