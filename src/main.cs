@@ -118,11 +118,11 @@ class Program
 					File.WriteAllText(outputFilename, output);
 				}
 				else {
-					Console.Write(output);
+					Console.WriteLine(output);
 				}
 
 				if (!string.IsNullOrEmpty(error)) {
-					Console.Error.Write(error);
+					Console.Error.WriteLine(error);
 				}
 			}
 			else {
