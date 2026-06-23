@@ -13,7 +13,7 @@ class Program
 			if (command.StartsWith("echo")) {
 				string echoArguments = command.Substring(5);
 				
-				Console.WriteLine(_ParseEchoArguments(echoArguments));
+				Console.WriteLine(string.Join(" ", ParseArguments(echoArguments)));
 				continue;
 			}
 
@@ -66,13 +66,24 @@ class Program
 			}
 			// real command management
 
-			int index = command.IndexOf(' ');
-			string commandName = command.Substring(0, index);
-			string args = command.Substring(index + 1);
+			var tokens = ParseArguments(command);
+
+			string commandName = tokens[0];
 
 			string commandPath = _FindCommandInPath(commandName);
 			if (!string.IsNullOrEmpty(commandPath)) {
-				Process.Start(commandName, _ParseEchoArguments(args)).WaitForExit();
+				var psi = new ProcessStartInfo(commandPath);
+
+				foreach (var arg in tokens.Skip(1)) {
+					psi.ArgumentList.Add(arg);
+				}
+
+				psi.RedirectStandardOutput = true;
+				psi.UseShellExecute = false;
+
+				using var process = Process.Start(psi);
+
+				process.WaitForExit();
 			}
 			else {
 				Console.WriteLine($"{command}: command not found");
@@ -82,14 +93,14 @@ class Program
 
 	}
 
-	private static string _ParseEchoArguments(string echoArguments)
+	private static List<string> ParseArguments(string input)
 	{
 		var args = new List<string>();
 		var current = new StringBuilder();
 
 		bool inSingleQuotes = false;
 
-		foreach (char c in echoArguments) {
+		foreach (char c in input) {
 			if (c == '\'') {
 				inSingleQuotes = !inSingleQuotes;
 				continue;
@@ -109,7 +120,7 @@ class Program
 		if (current.Length > 0)
 			args.Add(current.ToString());
 
-		return string.Join(" ", args);
+		return args;
 	}
 
 	private static string _FindCommandInPath(string specifiedCommand)
