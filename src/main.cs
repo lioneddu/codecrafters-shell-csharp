@@ -21,7 +21,7 @@ class Program
 					}
 					string outputFile = arguments[operatorIndex + 1];
 
-					File.WriteAllText(outputFile, string.Join(" ", arguments[..operatorIndex]));
+					File.WriteAllLines(outputFile, arguments[..operatorIndex]);
 				}
 				else {
 					Console.WriteLine(string.Join(" ", arguments));
