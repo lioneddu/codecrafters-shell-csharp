@@ -104,18 +104,27 @@ class Program
 		var current = new StringBuilder();
 
 		bool inSingleQuotes = false;
+		bool inDoubleQuotes = false;
 
 		foreach (char c in input) {
-			if (c == '\'') {
+			if (!inDoubleQuotes && c == '\'') {
 				inSingleQuotes = !inSingleQuotes;
 				continue;
 			}
 
-			if (!inSingleQuotes && char.IsWhiteSpace(c)) {
+			if (!inSingleQuotes && c == '"') {
+				inDoubleQuotes = !inDoubleQuotes;
+				continue;
+			}
+
+			if (!inSingleQuotes &&
+				!inDoubleQuotes &&
+				char.IsWhiteSpace(c)) {
 				if (current.Length > 0) {
 					args.Add(current.ToString());
 					current.Clear();
 				}
+
 				continue;
 			}
 
