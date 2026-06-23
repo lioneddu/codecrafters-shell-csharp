@@ -72,7 +72,8 @@ class Program
 
 			string commandPath = _FindCommandInPath(commandName);
 			if (!string.IsNullOrEmpty(commandPath)) {
-				var psi = new ProcessStartInfo(commandPath);
+				var psi = new ProcessStartInfo();
+				psi.FileName = commandName; //The system resolves the path, so we can just use the command name
 
 				foreach (var arg in tokens.Skip(1)) {
 					psi.ArgumentList.Add(arg);
