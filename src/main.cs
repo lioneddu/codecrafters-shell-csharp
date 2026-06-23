@@ -13,7 +13,7 @@ class Program
 			if (command.StartsWith("echo")) {
 				string echoArguments = command.Substring(5);
 				
-				Console.WriteLine(string.Join(" ", ParseArguments(echoArguments)));
+				Console.WriteLine(string.Join(" ", _ParseArguments(echoArguments)));
 				continue;
 			}
 
@@ -66,7 +66,7 @@ class Program
 			}
 			// real command management
 
-			var tokens = ParseArguments(command);
+			var tokens = _ParseArguments(command);
 
 			string commandName = tokens[0];
 
@@ -83,7 +83,11 @@ class Program
 
 				using var process = Process.Start(psi);
 
+				string output = process.StandardOutput.ReadToEnd();
+
 				process.WaitForExit();
+
+				Console.Write(output);
 			}
 			else {
 				Console.WriteLine($"{command}: command not found");
@@ -93,7 +97,7 @@ class Program
 
 	}
 
-	private static List<string> ParseArguments(string input)
+	private static List<string> _ParseArguments(string input)
 	{
 		var args = new List<string>();
 		var current = new StringBuilder();
