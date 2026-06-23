@@ -65,11 +65,14 @@ class Program
 
 			}
 			// real command management
-			string[] args = command.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			string commandName = args[0];
+
+			int index = command.IndexOf(' ');
+			string commandName = command.Substring(0, index);
+			string args = command.Substring(index + 1);
+
 			string commandPath = _FindCommandInPath(commandName);
 			if (!string.IsNullOrEmpty(commandPath)) {
-				Process.Start(commandName, _ParseEchoArguments(string.Join(" ", args[1..]))).WaitForExit();
+				Process.Start(commandName, _ParseEchoArguments(args)).WaitForExit();
 			}
 			else {
 				Console.WriteLine($"{command}: command not found");
@@ -106,7 +109,7 @@ class Program
 		if (current.Length > 0)
 			args.Add(current.ToString());
 
-		return string.Join(" ", args);
+		return args;
 	}
 
 	private static string _FindCommandInPath(string specifiedCommand)
