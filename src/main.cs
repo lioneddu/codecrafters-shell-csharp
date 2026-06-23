@@ -246,6 +246,9 @@ class Program
 
 					Console.Write(missing + " ");
 				}
+				else {
+					Console.WriteLine("\x07");
+				}
 
 				continue;
 			}
