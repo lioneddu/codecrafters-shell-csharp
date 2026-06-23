@@ -106,7 +106,20 @@ class Program
 		bool inSingleQuotes = false;
 		bool inDoubleQuotes = false;
 
-		foreach (char c in input) {
+		for (int i = 0; i < input.Length; i++) {
+			char c = input[i];
+
+			// Backslash escaping handling
+			if (!inSingleQuotes &&
+				!inDoubleQuotes &&
+				c == '\\') {
+				if (i + 1 < input.Length) {
+					current.Append(input[++i]);
+				}
+
+				continue;
+			}
+
 			if (!inDoubleQuotes && c == '\'') {
 				inSingleQuotes = !inSingleQuotes;
 				continue;
@@ -131,8 +144,9 @@ class Program
 			current.Append(c);
 		}
 
-		if (current.Length > 0)
+		if (current.Length > 0) {
 			args.Add(current.ToString());
+		}
 
 		return args;
 	}
