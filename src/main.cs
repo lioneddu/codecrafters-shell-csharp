@@ -102,6 +102,7 @@ class Program
 				}
 
 				psi.RedirectStandardOutput = true;
+				psi.RedirectStandardError = true;
 				psi.UseShellExecute = false;
 
 				using var process = Process.Start(psi);
