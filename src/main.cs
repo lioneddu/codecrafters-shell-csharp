@@ -109,27 +109,34 @@ class Program
 
 				string outputFilename = string.Empty;
 				string errorFilename = string.Empty;
-				bool redirectOutput = false;
-				bool redirectError = false;
+				RedirectMode stdoutMode = RedirectMode.None;
+				RedirectMode stderrMode = RedirectMode.None;
+
 
 				foreach (var arg in tokens.Skip(1)) {
 
 					if (arg == ">" || arg == "1>") {
-						redirectOutput = true;
+						stdoutMode = RedirectMode.Overwrite;
 						continue;
 					}
+
+					if (arg == ">>" || arg == "1>>") {
+						stdoutMode = RedirectMode.Append;
+						continue;
+					}
+
 
 					if (arg == "2>") {
-						redirectError = true;
+						stderrMode = RedirectMode.Overwrite;
 						continue;
 					}
 
-					if (redirectOutput && arg != ">" && arg != "1>") {
+					if (stdoutMode != RedirectMode.None && arg != ">" && arg != "1>") {
 						outputFilename = arg;
 						continue;
 					}
 
-					if (redirectError && arg != "2>") {
+					if (stderrMode != RedirectMode.None && arg != "2>") {
 						errorFilename = arg;
 						continue;
 					}
@@ -149,15 +156,12 @@ class Program
 				string error = process.StandardError.ReadToEnd();
 				process.WaitForExit();
 
-				if (redirectOutput && !string.IsNullOrEmpty(outputFilename)) {
-					File.WriteAllText(outputFilename, output);
-				}
-				else {
-					Console.Write(output);
+				if (!string.IsNullOrEmpty(outputFilename)) {
+					_WriteOutput(output, stdoutMode, outputFilename);
 				}
 
-				if (redirectError && !string.IsNullOrEmpty(errorFilename)) {
-					File.WriteAllText(errorFilename, error);
+				if (stderrMode != RedirectMode.None && !string.IsNullOrEmpty(errorFilename)) {
+					_WriteOutput(error, stderrMode, errorFilename);
 				}
 				else {
 					Console.Error.Write(error);
@@ -172,6 +176,29 @@ class Program
 
 	}
 
+	enum RedirectMode
+	{
+		None,
+		Overwrite,
+		Append
+	}
+
+	private static void _WriteOutput(string output, RedirectMode mode, string fileName)
+	{
+		switch (mode) {
+			case RedirectMode.None:
+				Console.Write(output);
+				break;
+
+			case RedirectMode.Overwrite:
+				File.WriteAllText(fileName, output);
+				break;
+
+			case RedirectMode.Append:
+				File.AppendAllText(fileName, output);
+				break;
+		}
+	}
 
 	private static List<string> _ParseArguments(string input)
 	{
