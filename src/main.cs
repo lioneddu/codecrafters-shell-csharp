@@ -120,6 +120,24 @@ class Program
 				continue;
 			}
 
+			if (inDoubleQuotes && c == '\\') {
+				if (i + 1 < input.Length) {
+					char next = input[i + 1];
+
+					if (next == '"' ||
+						next == '\\' ||
+						next == '$' ||
+						next == '`') {
+						current.Append(next);
+						i++;
+						continue;
+					}
+				}
+
+				current.Append('\\');
+				continue;
+			}
+
 			if (!inDoubleQuotes && c == '\'') {
 				inSingleQuotes = !inSingleQuotes;
 				continue;
