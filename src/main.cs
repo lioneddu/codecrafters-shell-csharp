@@ -14,8 +14,11 @@ class Program
 				string echoArguments = command.Substring(5);
 				var arguments = _ParseArguments(echoArguments);
 
-				if (arguments.Contains(">")) {
+				if (arguments.Contains(">") || arguments.Contains("1>")) {
 					int operatorIndex = arguments.IndexOf(">");
+					if (operatorIndex == -1) {
+						operatorIndex = arguments.IndexOf("1>");
+					}
 					string outputFile = arguments[operatorIndex + 1];
 
 					File.WriteAllText(outputFile, string.Join(" ", arguments[..operatorIndex]));
@@ -88,12 +91,12 @@ class Program
 				bool redirectOutput = false;
 				foreach (var arg in tokens.Skip(1)) {
 
-					if (arg == ">") {
+					if (arg == ">" || arg == "1>") {
 						redirectOutput = true;
 						continue;
 					}
 
-					if (redirectOutput && arg != ">") {
+					if (redirectOutput && arg != ">" && arg != "1>") {
 						outputFilename = arg;
 						break;
 					}
