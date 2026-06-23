@@ -6,9 +6,14 @@ class Program
 {
 	static void Main()
 	{
+		string[] builtInCommands = new string[] { "echo", "exit", "type", "pwd", "cd" };
+
 		while (true) {
 			Console.Write("$ ");
-			string command = Console.ReadLine();
+
+
+			string command = _ReadCommandLine(builtInCommands);
+			//string command = Console.ReadLine();
 
 			if (command.StartsWith("echo")) {
 				string echoArguments = command.Substring(5);
@@ -70,7 +75,7 @@ class Program
 
 			if (command.StartsWith("type")) {
 				string specifiedCommand = command.Split(" ")[1];
-				string[] builtInCommands = new string[] { "echo", "exit", "type", "pwd", "cd" };
+
 
 				if (builtInCommands.Contains(specifiedCommand.Trim())) {
 					Console.WriteLine($"{specifiedCommand} is a shell builtin");
@@ -197,6 +202,59 @@ class Program
 		}
 
 
+	}
+
+	private static string _ReadCommandLine(string[] builtInCommands)
+	{
+		string command;
+		var buffer = new StringBuilder();
+
+		while (true) {
+			var key = Console.ReadKey(true);
+
+			// input complete
+			if (key.Key == ConsoleKey.Enter) {
+				Console.WriteLine();
+				command = buffer.ToString();
+				break;
+			}
+
+			// input edit
+			if (key.Key == ConsoleKey.Backspace) {
+				if (buffer.Length > 0) {
+					buffer.Length--; //remove last character
+
+					Console.Write("\b \b");
+				}
+
+				continue;
+			}
+
+			if (key.Key == ConsoleKey.Tab) {
+				string current = buffer.ToString();
+				var matches = builtInCommands
+							.Where(c => c.StartsWith(current))
+							.ToList();
+
+				if (matches.Count == 1) {
+					string completion = matches[0];
+
+					string missing = completion.Substring(current.Length);
+
+					buffer.Append(missing);
+					buffer.Append(' ');
+
+					Console.Write(missing + " ");
+				}
+
+				continue;
+			}
+
+			buffer.Append(key.KeyChar);
+			Console.Write(key.KeyChar);
+		}
+
+		return command;
 	}
 
 	enum RedirectMode
