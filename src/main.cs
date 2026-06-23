@@ -115,7 +115,7 @@ class Program
 				process.WaitForExit();
 
 				if (redirectOutput && !string.IsNullOrEmpty(outputFilename)) {
-					File.WriteAllText(outputFilename, output);
+					File.WriteAllLines(outputFilename, output.Split('\n'));
 				}
 				else {
 					Console.WriteLine(output);
