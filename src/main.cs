@@ -21,7 +21,7 @@ class Program
 					}
 					string outputFile = arguments[operatorIndex + 1];
 
-					File.WriteAllText(outputFile, string.Join(" ", arguments[..operatorIndex]));
+					File.WriteAllText(outputFile, string.Join(" ", arguments[..operatorIndex] + Environment.NewLine));
 				}
 				else {
 					Console.WriteLine(string.Join(" ", arguments));
@@ -115,7 +115,7 @@ class Program
 				process.WaitForExit();
 
 				if (redirectOutput && !string.IsNullOrEmpty(outputFilename)) {
-					File.WriteAllText(outputFilename, output);
+					File.WriteAllText(outputFilename, output + Environment.NewLine);
 				}
 				else {
 					Console.Write(output);
