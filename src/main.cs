@@ -14,17 +14,36 @@ class Program
 				string echoArguments = command.Substring(5);
 				var arguments = _ParseArguments(echoArguments);
 
-				if (arguments.Contains(">") || arguments.Contains("1>")) {
-					int operatorIndex = arguments.IndexOf(">");
-					if (operatorIndex == -1) {
-						operatorIndex = arguments.IndexOf("1>");
-					}
-					string outputFile = arguments[operatorIndex + 1];
+				int stdoutRedirect = arguments.IndexOf(">");
+				if (stdoutRedirect == -1)
+					stdoutRedirect = arguments.IndexOf("1>");
 
-					File.WriteAllText(outputFile, string.Join(" ", arguments[..operatorIndex]) + "\n");
+				int stderrRedirect = arguments.IndexOf("2>");
+
+				string output = string.Empty;
+
+				int stopIndex = arguments.Count;
+
+				if (stdoutRedirect >= 0)
+					stopIndex = Math.Min(stopIndex, stdoutRedirect);
+
+				if (stderrRedirect >= 0)
+					stopIndex = Math.Min(stopIndex, stderrRedirect);
+
+				output = string.Join(" ", arguments.Take(stopIndex));
+
+				if (stdoutRedirect >= 0) {
+					string fileName = arguments[stdoutRedirect + 1];
+					File.WriteAllText(fileName, output + "\n");
 				}
 				else {
-					Console.WriteLine(string.Join(" ", arguments));
+					Console.WriteLine(output);
+				}
+
+				if (stderrRedirect >= 0) {
+					string fileName = arguments[stderrRedirect + 1];
+
+					File.WriteAllText(fileName, string.Empty);
 				}
 
 				continue;
@@ -87,8 +106,12 @@ class Program
 			if (!string.IsNullOrEmpty(commandPath)) {
 				var psi = new ProcessStartInfo();
 				psi.FileName = commandName; //The system resolves the path, so we can just use the command name
+
 				string outputFilename = string.Empty;
+				string errorFilename = string.Empty;
 				bool redirectOutput = false;
+				bool redirectError = false;
+
 				foreach (var arg in tokens.Skip(1)) {
 
 					if (arg == ">" || arg == "1>") {
@@ -96,12 +119,24 @@ class Program
 						continue;
 					}
 
-					if (redirectOutput && arg != ">" && arg != "1>") {
-						outputFilename = arg;
-						break;
+					if (arg == "2>") {
+						redirectError = true;
+						continue;
 					}
 
+					if (redirectOutput && arg != ">" && arg != "1>") {
+						outputFilename = arg;
+						continue;
+					}
+
+					if (redirectError && arg != "2>") {
+						errorFilename = arg;
+						continue;
+					}
+
+
 					psi.ArgumentList.Add(arg);
+
 				}
 
 				psi.RedirectStandardOutput = true;
@@ -121,7 +156,10 @@ class Program
 					Console.Write(output);
 				}
 
-				if (!string.IsNullOrEmpty(error)) {
+				if (redirectError && !string.IsNullOrEmpty(errorFilename)) {
+					File.WriteAllText(errorFilename, error);
+				}
+				else {
 					Console.Error.Write(error);
 				}
 			}
@@ -135,103 +173,103 @@ class Program
 	}
 
 
-private static List<string> _ParseArguments(string input)
-{
-	var args = new List<string>();
-	var current = new StringBuilder();
+	private static List<string> _ParseArguments(string input)
+	{
+		var args = new List<string>();
+		var current = new StringBuilder();
 
-	bool inSingleQuotes = false;
-	bool inDoubleQuotes = false;
+		bool inSingleQuotes = false;
+		bool inDoubleQuotes = false;
 
-	for (int i = 0; i < input.Length; i++) {
-		char c = input[i];
+		for (int i = 0; i < input.Length; i++) {
+			char c = input[i];
 
-		// Backslash escaping handling
-		if (!inSingleQuotes &&
-			!inDoubleQuotes &&
-			c == '\\') {
-			if (i + 1 < input.Length) {
-				current.Append(input[++i]);
-			}
-
-			continue;
-		}
-
-		if (inDoubleQuotes && c == '\\') {
-			if (i + 1 < input.Length) {
-				char next = input[i + 1];
-
-				if (next == '"' ||
-					next == '\\' ||
-					next == '$' ||
-					next == '`') {
-					current.Append(next);
-					i++;
-					continue;
+			// Backslash escaping handling
+			if (!inSingleQuotes &&
+				!inDoubleQuotes &&
+				c == '\\') {
+				if (i + 1 < input.Length) {
+					current.Append(input[++i]);
 				}
+
+				continue;
 			}
 
-			current.Append('\\');
-			continue;
-		}
+			if (inDoubleQuotes && c == '\\') {
+				if (i + 1 < input.Length) {
+					char next = input[i + 1];
 
-		if (!inDoubleQuotes && c == '\'') {
-			inSingleQuotes = !inSingleQuotes;
-			continue;
-		}
-
-		if (!inSingleQuotes && c == '"') {
-			inDoubleQuotes = !inDoubleQuotes;
-			continue;
-		}
-
-		if (!inSingleQuotes &&
-			!inDoubleQuotes &&
-			char.IsWhiteSpace(c)) {
-			if (current.Length > 0) {
-				args.Add(current.ToString());
-				current.Clear();
-			}
-
-			continue;
-		}
-
-		current.Append(c);
-	}
-
-	if (current.Length > 0) {
-		args.Add(current.ToString());
-	}
-
-	return args;
-}
-
-private static string _FindCommandInPath(string specifiedCommand)
-{
-	try {
-
-		string path = Environment.GetEnvironmentVariable("PATH");
-		bool isFound = false;
-		if (!string.IsNullOrEmpty(path)) {
-
-			foreach (string dir in path.Split(':')) {
-				string fullPath = Path.Combine(dir, specifiedCommand);
-				if (File.Exists(fullPath) && File.GetUnixFileMode(fullPath).HasFlag(UnixFileMode.UserExecute)) {
-					isFound = true;
-					return fullPath;
+					if (next == '"' ||
+						next == '\\' ||
+						next == '$' ||
+						next == '`') {
+						current.Append(next);
+						i++;
+						continue;
+					}
 				}
+
+				current.Append('\\');
+				continue;
 			}
 
-			if (!isFound) {
-				return string.Empty;
+			if (!inDoubleQuotes && c == '\'') {
+				inSingleQuotes = !inSingleQuotes;
+				continue;
 			}
 
+			if (!inSingleQuotes && c == '"') {
+				inDoubleQuotes = !inDoubleQuotes;
+				continue;
+			}
+
+			if (!inSingleQuotes &&
+				!inDoubleQuotes &&
+				char.IsWhiteSpace(c)) {
+				if (current.Length > 0) {
+					args.Add(current.ToString());
+					current.Clear();
+				}
+
+				continue;
+			}
+
+			current.Append(c);
 		}
 
-		return string.Empty;
+		if (current.Length > 0) {
+			args.Add(current.ToString());
+		}
+
+		return args;
 	}
-	catch (SecurityException exception) {
-		return string.Empty;
+
+	private static string _FindCommandInPath(string specifiedCommand)
+	{
+		try {
+
+			string path = Environment.GetEnvironmentVariable("PATH");
+			bool isFound = false;
+			if (!string.IsNullOrEmpty(path)) {
+
+				foreach (string dir in path.Split(':')) {
+					string fullPath = Path.Combine(dir, specifiedCommand);
+					if (File.Exists(fullPath) && File.GetUnixFileMode(fullPath).HasFlag(UnixFileMode.UserExecute)) {
+						isFound = true;
+						return fullPath;
+					}
+				}
+
+				if (!isFound) {
+					return string.Empty;
+				}
+
+			}
+
+			return string.Empty;
+		}
+		catch (SecurityException exception) {
+			return string.Empty;
+		}
 	}
-}
 }
