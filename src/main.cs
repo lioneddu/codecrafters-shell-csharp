@@ -150,6 +150,11 @@ class Program
 						continue;
 					}
 
+					if (arg == "2>>") {
+						stderrMode = RedirectMode.Append;
+						continue;
+					}
+
 					if (stdoutMode != RedirectMode.None && arg != ">" && arg != "1>") {
 						outputFilename = arg;
 						continue;
