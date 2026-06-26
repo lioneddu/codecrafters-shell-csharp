@@ -6,13 +6,19 @@ class Program
 {
 	static void Main()
 	{
-		string[] builtInCommands = new string[] { "echo", "exit", "type", "pwd", "cd" };
+		string[] commands = new string[] { "echo", "exit", "type", "pwd", "cd" };
+		string[] pathDirectories = Environment.GetEnvironmentVariable("PATH").Split(":");
+
+		foreach (string pathDirectory in pathDirectories) {
+			foreach (string command in Directory.GetFiles(pathDirectory)) {
+				commands = commands.Append(command).ToArray();
+			}
+		}		
 
 		while (true) {
 			Console.Write("$ ");
 
-
-			string command = _ReadCommandLine(builtInCommands);
+			string command = _ReadCommandLine(commands);
 			//string command = Console.ReadLine();
 
 			if (command.StartsWith("echo")) {
@@ -77,7 +83,7 @@ class Program
 				string specifiedCommand = command.Split(" ")[1];
 
 
-				if (builtInCommands.Contains(specifiedCommand.Trim())) {
+				if (commands.Contains(specifiedCommand.Trim())) {
 					Console.WriteLine($"{specifiedCommand} is a shell builtin");
 				}
 				else {
@@ -247,7 +253,7 @@ class Program
 					Console.Write(missing + " ");
 				}
 				else {
-					Console.WriteLine("\x07");
+					Console.WriteLine("\x07"); //bell character
 				}
 
 				continue;
