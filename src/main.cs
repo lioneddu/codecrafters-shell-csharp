@@ -10,10 +10,13 @@ class Program
 		string[] pathDirectories = Environment.GetEnvironmentVariable("PATH").Split(":");
 
 		foreach (string pathDirectory in pathDirectories) {
-			foreach (string command in Directory.GetFiles(pathDirectory)) {
-				commands = commands.Append(command).ToArray();
+			if (Directory.Exists(pathDirectory)) {
+				foreach (string command in Directory.GetFiles(pathDirectory)) {
+					commands = commands.Append(command).ToArray();
+				}
 			}
-		}		
+		}
+
 
 		while (true) {
 			Console.Write("$ ");
