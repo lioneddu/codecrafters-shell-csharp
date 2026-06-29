@@ -12,7 +12,7 @@ class Program
 		foreach (string pathDirectory in pathDirectories) {
 			if (Directory.Exists(pathDirectory)) {
 				foreach (string command in Directory.GetFiles(pathDirectory)) {
-					commands = commands.Append(command).ToArray();
+					commands = commands.Append(Path.GetFileName(command)).ToArray();
 				}
 			}
 		}
