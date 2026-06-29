@@ -86,17 +86,23 @@ class Program
 				continue;
 			}
 
-			if (builtInCommands.Contains(command)) {
-				Console.WriteLine($"{command} is a shell builtin");
-			}
-			else {
-				string specifiedCommand = command.Split(" ")[0];
-				string path = _FindCommandInPath(specifiedCommand);
+			if (command.StartsWith("type")) {
 
-				if (string.IsNullOrEmpty(path))
-					Console.WriteLine($"{specifiedCommand}: not found");
-				else
-					Console.WriteLine($"{specifiedCommand} is {path}");
+				string specifiedCommand = command.Split(" ")[1];
+
+				if (builtInCommands.Contains(specifiedCommand)) {
+					Console.WriteLine($"{specifiedCommand} is a shell builtin");
+				}
+				else {
+					string path = _FindCommandInPath(specifiedCommand);
+
+					if (string.IsNullOrEmpty(path))
+						Console.WriteLine($"{specifiedCommand}: not found");
+					else
+						Console.WriteLine($"{specifiedCommand} is {path}");
+				}
+
+				continue;
 			}
 
 			if (command.StartsWith("pwd")) {
