@@ -90,7 +90,7 @@ class Program
 				Console.WriteLine($"{command} is a shell builtin");
 			}
 			else {
-				string specifiedCommand = command.Split(" ")[1];
+				string specifiedCommand = command.Split(" ")[0];
 				string path = _FindCommandInPath(specifiedCommand);
 
 				if (string.IsNullOrEmpty(path))
