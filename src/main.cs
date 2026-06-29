@@ -18,7 +18,7 @@ class Program
 				continue;
 
 			foreach (string file in Directory.GetFiles(pathDirectory)) {
-				allCommands = allCommands.Append(Path.GetFileName(file)).ToArray();
+				allCommands = allCommands.Append(Path.GetFileName(file)).Distinct().ToArray();
 			}
 		}
 
