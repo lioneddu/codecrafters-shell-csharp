@@ -17,6 +17,8 @@ class Program
 			}
 		}
 
+		foreach (var c in commands)
+			Console.Error.WriteLine(c);
 
 		while (true) {
 			Console.Write("$ ");
