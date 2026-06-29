@@ -247,8 +247,10 @@ class Program
 			if (key.Key == ConsoleKey.Tab) {
 				string current = buffer.ToString();
 
+				string currentCommand = current.Split(' ', 2)[0];
+
 				var matches = allCommands
-					.Where(c => c.StartsWith(current))
+					.Where(c => c.StartsWith(currentCommand))
 					.OrderBy(c => c)
 					.ToList();
 
@@ -267,6 +269,18 @@ class Program
 					buffer.Append(' ');
 
 					Console.Write(missing + " ");
+
+					previousWasTab = false;
+					continue;
+				}
+
+				string lcp = LongestCommonPrefix(matches);
+
+				if (lcp.Length > current.Length) {
+					string missing = lcp.Substring(current.Length);
+
+					buffer.Append(missing);
+					Console.Write(missing);
 
 					previousWasTab = false;
 					continue;
@@ -297,6 +311,31 @@ class Program
 		}
 
 		return command;
+	}
+
+	private static string LongestCommonPrefix(List<string> strings)
+	{
+		if (strings.Count == 0)
+			return string.Empty;
+
+		string prefix = strings[0];
+
+		foreach (var s in strings.Skip(1)) {
+			int i = 0;
+
+			while (i < prefix.Length &&
+				   i < s.Length &&
+				   prefix[i] == s[i]) {
+				i++;
+			}
+
+			prefix = prefix.Substring(0, i);
+
+			if (prefix.Length == 0)
+				break;
+		}
+
+		return prefix;
 	}
 
 	enum RedirectMode
