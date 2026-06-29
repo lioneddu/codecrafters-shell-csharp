@@ -12,13 +12,10 @@ class Program
 		foreach (string pathDirectory in pathDirectories) {
 			if (Directory.Exists(pathDirectory)) {
 				foreach (string command in Directory.GetFiles(pathDirectory)) {
-					commands = commands.Append(Path.GetFileName(command)).ToArray();
+					commands = commands.Append(Path.GetFileName(command)).Distinct().ToArray();
 				}
 			}
 		}
-
-		foreach (var c in commands)
-			Console.Error.WriteLine(c);
 
 		while (true) {
 			Console.Write("$ ");
