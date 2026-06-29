@@ -216,9 +216,10 @@ class Program
 
 	}
 
-	private static string _ReadCommandLine(string[] builtInCommands)
+	private static string _ReadCommandLine(string[] allCommands)
 	{
 		string command;
+		bool previousWasTab = false;
 		var buffer = new StringBuilder();
 
 		while (true) {
@@ -228,6 +229,7 @@ class Program
 			if (key.Key == ConsoleKey.Enter) {
 				Console.WriteLine();
 				command = buffer.ToString();
+				previousWasTab = false;
 				break;
 			}
 
@@ -238,15 +240,23 @@ class Program
 
 					Console.Write("\b \b");
 				}
-
+				previousWasTab = false;
 				continue;
 			}
 
 			if (key.Key == ConsoleKey.Tab) {
 				string current = buffer.ToString();
-				var matches = builtInCommands
-							.Where(c => c.StartsWith(current))
-							.ToList();
+
+				var matches = allCommands
+					.Where(c => c.StartsWith(current))
+					.OrderBy(c => c)
+					.ToList();
+
+				if (matches.Count == 0) {
+					Console.Write("\x07");
+					previousWasTab = false;
+					continue;
+				}
 
 				if (matches.Count == 1) {
 					string completion = matches[0];
@@ -257,16 +267,33 @@ class Program
 					buffer.Append(' ');
 
 					Console.Write(missing + " ");
-				}
-				else {
-					Console.WriteLine("\x07"); //bell character
+
+					previousWasTab = false;
+					continue;
 				}
 
+				// multiple matches
+				if (!previousWasTab) {
+					Console.Write("\x07");
+					previousWasTab = true;
+					continue;
+				}
+
+				Console.WriteLine();
+
+				Console.WriteLine(string.Join("  ", matches));
+
+				Console.Write("$ ");
+				Console.Write(buffer.ToString());
+
+				previousWasTab = false;
 				continue;
 			}
 
+			previousWasTab = false;
 			buffer.Append(key.KeyChar);
 			Console.Write(key.KeyChar);
+
 		}
 
 		return command;
