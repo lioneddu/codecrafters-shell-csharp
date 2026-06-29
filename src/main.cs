@@ -90,12 +90,13 @@ class Program
 				Console.WriteLine($"{command} is a shell builtin");
 			}
 			else {
-				string path = _FindCommandInPath(command);
+				string specifiedCommand = command.Split(" ")[1];
+				string path = _FindCommandInPath(specifiedCommand);
 
 				if (string.IsNullOrEmpty(path))
-					Console.WriteLine($"{command}: not found");
+					Console.WriteLine($"{specifiedCommand}: not found");
 				else
-					Console.WriteLine($"{command} is {path}");
+					Console.WriteLine($"{specifiedCommand} is {path}");
 			}
 
 			if (command.StartsWith("pwd")) {
