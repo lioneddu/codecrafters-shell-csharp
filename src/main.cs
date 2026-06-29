@@ -6,21 +6,26 @@ class Program
 {
 	static void Main()
 	{
-		string[] commands = new string[] { "echo", "exit", "type", "pwd", "cd" };
-		string[] pathDirectories = Environment.GetEnvironmentVariable("PATH").Split(":");
+		string[] builtInCommands =	{"echo","exit",	"type",	"pwd",	"cd"};
+
+		var allCommands = new string[builtInCommands.Length];
+		builtInCommands.CopyTo(allCommands, 0);
+
+		string[] pathDirectories = Environment.GetEnvironmentVariable("PATH").Split(':');
 
 		foreach (string pathDirectory in pathDirectories) {
-			if (Directory.Exists(pathDirectory)) {
-				foreach (string command in Directory.GetFiles(pathDirectory)) {
-					commands = commands.Append(Path.GetFileName(command)).Distinct().ToArray();
-				}
+			if (!Directory.Exists(pathDirectory))
+				continue;
+
+			foreach (string file in Directory.GetFiles(pathDirectory)) {
+				allCommands = allCommands.Append(Path.GetFileName(file)).ToArray();
 			}
 		}
 
 		while (true) {
 			Console.Write("$ ");
 
-			string command = _ReadCommandLine(commands);
+			string command = _ReadCommandLine(allCommands);
 			//string command = Console.ReadLine();
 
 			if (command.StartsWith("echo")) {
@@ -81,24 +86,16 @@ class Program
 				continue;
 			}
 
-			if (command.StartsWith("type")) {
-				string specifiedCommand = command.Split(" ")[1];
+			if (builtInCommands.Contains(command)) {
+				Console.WriteLine($"{command} is a shell builtin");
+			}
+			else {
+				string path = _FindCommandInPath(command);
 
-
-				if (commands.Contains(specifiedCommand.Trim())) {
-					Console.WriteLine($"{specifiedCommand} is a shell builtin");
-				}
-				else {
-					string path = _FindCommandInPath(specifiedCommand);
-					if (string.IsNullOrEmpty(path)) {
-						Console.WriteLine($"{specifiedCommand}: not found");
-					}
-					else {
-						Console.WriteLine($"{specifiedCommand} is {path}");
-					}
-				}
-
-				continue;
+				if (string.IsNullOrEmpty(path))
+					Console.WriteLine($"{command}: not found");
+				else
+					Console.WriteLine($"{command} is {path}");
 			}
 
 			if (command.StartsWith("pwd")) {
