@@ -259,27 +259,39 @@ class Program
 				else {
 					// Filename completion
 					prefix = line[(lastSpace + 1)..];
-					
-					string directory;
-					string partialName;
+
+					string searchDirectory;
+					string filePrefix;
+					string pathPrefix;
 
 					if (prefix.Contains('/')) {
-						directory = Path.GetDirectoryName(prefix);
-						partialName = Path.GetFileName(prefix);
+						int lastSlash = prefix.LastIndexOf('/');
 
-						if (string.IsNullOrEmpty(directory))
-							directory = "/";
+						pathPrefix = prefix[..(lastSlash + 1)];
+						filePrefix = prefix[(lastSlash + 1)..];
+
+						searchDirectory = string.IsNullOrEmpty(pathPrefix)
+							? "."
+							: pathPrefix;
 					}
 					else {
-						directory = Directory.GetCurrentDirectory();
-						partialName = prefix;
+						searchDirectory = ".";
+						pathPrefix = "";
+						filePrefix = prefix;
+					}
+
+					if (!Directory.Exists(searchDirectory)) {
+						Console.Write("\x07");
+						previousWasTab = false;
+						continue;
 					}
 
 					matches = Directory
-						.GetFileSystemEntries(directory)
+						.GetFileSystemEntries(searchDirectory)
 						.Select(Path.GetFileName)
-						.Where(f => f.StartsWith(partialName))
+						.Where(f => f.StartsWith(filePrefix))
 						.OrderBy(f => f)
+						.Select(f => pathPrefix + f)
 						.ToList();
 				}
 
