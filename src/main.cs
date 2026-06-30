@@ -218,99 +218,115 @@ class Program
 
 	private static string _ReadCommandLine(string[] allCommands)
 	{
-		string command;
-		bool previousWasTab = false;
 		var buffer = new StringBuilder();
+		bool previousWasTab = false;
 
 		while (true) {
 			var key = Console.ReadKey(true);
 
-			// input complete
 			if (key.Key == ConsoleKey.Enter) {
 				Console.WriteLine();
-				command = buffer.ToString();
-				previousWasTab = false;
-				break;
+				return buffer.ToString();
 			}
 
-			// input edit
 			if (key.Key == ConsoleKey.Backspace) {
 				if (buffer.Length > 0) {
-					buffer.Length--; //remove last character
-
+					buffer.Length--;
 					Console.Write("\b \b");
 				}
+
 				previousWasTab = false;
 				continue;
 			}
 
 			if (key.Key == ConsoleKey.Tab) {
-				string current = buffer.ToString();
+				string line = buffer.ToString();
+				int lastSpace = line.LastIndexOf(' ');
 
-				string currentCommand = current.Split(' ', 2)[0];
+				List<string> matches;
+				string prefix;
 
-				var matches = allCommands
-					.Where(c => c.StartsWith(currentCommand))
-					.OrderBy(c => c)
-					.ToList();
+				if (lastSpace == -1) {
+					// Command completion
+					prefix = line;
 
-				if (matches.Count == 0) {
-					Console.Write("\x07");
-					previousWasTab = false;
-					continue;
+					matches = allCommands
+						.Where(c => c.StartsWith(prefix))
+						.OrderBy(c => c)
+						.ToList();
+				}
+				else {
+					// Filename completion
+					prefix = line[(lastSpace + 1)..];
+
+					matches = Directory
+						.GetFileSystemEntries(Directory.GetCurrentDirectory())
+						.Select(Path.GetFileName)
+						.Where(f => f.StartsWith(prefix))
+						.OrderBy(f => f)
+						.ToList();
 				}
 
-				if (matches.Count == 1) {
-					string completion = matches[0];
-
-					string missing = completion.Substring(current.Length);
-
-					buffer.Append(missing);
-					buffer.Append(' ');
-
-					Console.Write(missing + " ");
-
-					previousWasTab = false;
-					continue;
-				}
-
-				string lcp = LongestCommonPrefix(matches);
-
-				if (lcp.Length > current.Length) {
-					string missing = lcp.Substring(current.Length);
-
-					buffer.Append(missing);
-					Console.Write(missing);
-
-					previousWasTab = false;
-					continue;
-				}
-
-				// multiple matches
-				if (!previousWasTab) {
-					Console.Write("\x07");
-					previousWasTab = true;
-					continue;
-				}
-
-				Console.WriteLine();
-
-				Console.WriteLine(string.Join("  ", matches));
-
-				Console.Write("$ ");
-				Console.Write(buffer.ToString());
-
-				previousWasTab = false;
+				Complete(matches, prefix, buffer, ref previousWasTab);
 				continue;
 			}
 
 			previousWasTab = false;
 			buffer.Append(key.KeyChar);
 			Console.Write(key.KeyChar);
+		}
+	}
 
+	private static void Complete(
+	List<string> matches,
+	string prefix,
+	StringBuilder buffer,
+	ref bool previousWasTab)
+	{
+		if (matches.Count == 0) {
+			Console.Write("\x07");
+			previousWasTab = false;
+			return;
 		}
 
-		return command;
+		if (matches.Count == 1) {
+			string completion = matches[0];
+			string missing = completion.Substring(prefix.Length);
+
+			buffer.Append(missing);
+			buffer.Append(' ');
+
+			Console.Write(missing + " ");
+
+			previousWasTab = false;
+			return;
+		}
+
+		string lcp = LongestCommonPrefix(matches);
+
+		if (lcp.Length > prefix.Length) {
+			string missing = lcp.Substring(prefix.Length);
+
+			buffer.Append(missing);
+			Console.Write(missing);
+
+			previousWasTab = false;
+			return;
+		}
+
+		if (!previousWasTab) {
+			Console.Write("\x07");
+			previousWasTab = true;
+			return;
+		}
+
+		Console.WriteLine();
+		Console.WriteLine(string.Join("  ", matches));
+
+		Console.Write("$ ");
+		Console.Write(buffer.ToString());
+
+		previousWasTab = false;
 	}
 
 	private static string LongestCommonPrefix(List<string> strings)
