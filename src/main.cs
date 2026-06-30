@@ -250,6 +250,7 @@ class Program
 					// Command completion
 					prefix = line;
 
+
 					matches = allCommands
 						.Where(c => c.StartsWith(prefix))
 						.OrderBy(c => c)
@@ -258,11 +259,26 @@ class Program
 				else {
 					// Filename completion
 					prefix = line[(lastSpace + 1)..];
+					
+					string directory;
+					string partialName;
+
+					if (prefix.Contains('/')) {
+						directory = Path.GetDirectoryName(prefix);
+						partialName = Path.GetFileName(prefix);
+
+						if (string.IsNullOrEmpty(directory))
+							directory = "/";
+					}
+					else {
+						directory = Directory.GetCurrentDirectory();
+						partialName = prefix;
+					}
 
 					matches = Directory
-						.GetFileSystemEntries(Directory.GetCurrentDirectory())
+						.GetFileSystemEntries(directory)
 						.Select(Path.GetFileName)
-						.Where(f => f.StartsWith(prefix))
+						.Where(f => f.StartsWith(partialName))
 						.OrderBy(f => f)
 						.ToList();
 				}
