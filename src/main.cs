@@ -10,10 +10,11 @@ class Program
 	static void Main()
 	{
 		_EnableRawTerminalMode();
+		var jobManager = new BackgroundJobManager();
 
 		try {
 
-			string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete" };
+			string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete", "jobs" };
 			Dictionary<string, string> customCompletions = new();
 
 			var allCommands = new string[builtInCommands.Length];
@@ -34,7 +35,16 @@ class Program
 				Console.Write("$ ");
 
 				string command = _ReadCommandLine(allCommands, customCompletions);
-				//string command = Console.ReadLine();
+
+				// Detect a trailing '&' marking this command to run in the background.
+				// The shell must not wait for it to finish before showing the next prompt.
+				bool isBackground = false;
+				string trimmedCommand = command.TrimEnd();
+
+				if (trimmedCommand.EndsWith("&")) {
+					isBackground = true;
+					command = trimmedCommand[..^1].TrimEnd();
+				}
 
 				if (command.StartsWith("echo")) {
 					string echoArguments = command.Substring(5);
@@ -166,6 +176,23 @@ class Program
 					continue;
 				}
 
+				if (command.Equals("jobs")) {
+					// List all background jobs
+					var jobList = jobManager.GetJobs();
+					
+					if (jobList.Any()) {
+						foreach (var job in jobList) {
+							Console.WriteLine($"[{job.Id}] {job.Process}");
+						}
+					}
+					else {
+						Console.WriteLine("$ ");
+
+					}
+
+					continue;
+				}
+
 
 				if (command.Equals("exit")) {
 					break;
@@ -218,15 +245,31 @@ class Program
 						psi.ArgumentList.Add(arg);
 					}
 
-					psi.RedirectStandardOutput = true;
-					psi.RedirectStandardError = true;
 					psi.UseShellExecute = false;
 
-					using var process = Process.Start(psi);
+					if (isBackground) {
+						// Background job: do not redirect or wait. Output goes straight to the
+						// terminal, same as bash's default behavior for '&' commands, and the
+						// shell must return to the prompt immediately.
+						psi.RedirectStandardOutput = false;
+						psi.RedirectStandardError = false;
 
-					string output = process.StandardOutput.ReadToEnd();
-					string error = process.StandardError.ReadToEnd();
-					process.WaitForExit();
+						var process = Process.Start(psi);
+						int jobId = jobManager.AddJob(process, command);
+
+						Console.WriteLine($"[{jobId}] {process.Id}");
+						continue;
+					}
+
+					// Foreground job: existing behavior (redirect, wait, write output).
+					psi.RedirectStandardOutput = true;
+					psi.RedirectStandardError = true;
+
+					using var fgProcess = Process.Start(psi);
+
+					string output = fgProcess.StandardOutput.ReadToEnd();
+					string error = fgProcess.StandardError.ReadToEnd();
+					fgProcess.WaitForExit();
 
 					_WriteOutput(output, stdoutMode, outputFilename);
 
@@ -236,6 +279,7 @@ class Program
 					else {
 						_WriteOutput(error, stderrMode, errorFilename);
 					}
+
 				}
 				else {
 					Console.WriteLine($"{command}: command not found");
@@ -661,5 +705,53 @@ class Program
 		catch (SecurityException exception) {
 			return string.Empty;
 		}
+	}
+}
+
+// Represents a single background process tracked by the shell.
+class Job
+{
+	public int Id { get; }
+	public Process Process { get; }
+	public string CommandLine { get; }
+
+	public Job(int id, Process process, string commandLine)
+	{
+		Id = id;
+		Process = process;
+		CommandLine = commandLine;
+	}
+}
+
+// Keeps track of all background jobs started with '&'.
+class BackgroundJobManager
+{
+	private readonly List<Job> _jobs = new();
+	private int _nextJobId = 1;
+
+	// Register a newly started background process and return its assigned job number.
+	public int AddJob(Process process, string commandLine)
+	{
+		int jobId = _nextJobId++;
+		_jobs.Add(new Job(jobId, process, commandLine));
+		return jobId;
+	}
+
+	// Return a snapshot of all currently tracked jobs, in job-number order.
+	public List<Job> GetJobs()
+	{
+		return _jobs.OrderBy(j => j.Id).ToList();
+	}
+
+	// Remove a job from the tracked list, e.g. once it has finished and been reported.
+	public void RemoveJob(int jobId)
+	{
+		_jobs.RemoveAll(j => j.Id == jobId);
+	}
+
+	// Find a job by its id, or null if it isn't tracked.
+	public Job? GetJob(int jobId)
+	{
+		return _jobs.FirstOrDefault(j => j.Id == jobId);
 	}
 }
