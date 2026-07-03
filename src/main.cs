@@ -38,6 +38,7 @@ class Program
 					Console.WriteLine($"[{finishedJob.Id}]+  Done                    {finishedJob.CommandLine}");
 					BackgroundJobManager.RemoveJob(finishedJob.Id);
 				}
+
 				Console.Write("$ ");
 
 				string command = _ReadCommandLine(allCommands, customCompletions);
@@ -52,12 +53,17 @@ class Program
 					command = trimmedCommand[..^1].TrimEnd();
 				}
 
+				if (_ContainsUnquotedPipe(command)) {
+					_ExecutePipeline(command, isBackground);
+					continue;
+				}
+
 				if (command.StartsWith("echo")) {
 					string echoArguments = command.Substring(5);
 					var arguments = _ParseArguments(echoArguments);
 
-					RedirectMode stdoutMode = RedirectMode.None;
-					RedirectMode stderrMode = RedirectMode.None;
+					RedirectMode echoStdoutMode = RedirectMode.None;
+					RedirectMode echoStderrMode = RedirectMode.None;
 
 					string stdoutFile = string.Empty;
 					string stderrFile = string.Empty;
@@ -68,25 +74,25 @@ class Program
 						string arg = arguments[i];
 
 						if (arg == ">" || arg == "1>") {
-							stdoutMode = RedirectMode.Overwrite;
+							echoStdoutMode = RedirectMode.Overwrite;
 							stdoutFile = arguments[++i];
 							continue;
 						}
 
 						if (arg == ">>" || arg == "1>>") {
-							stdoutMode = RedirectMode.Append;
+							echoStdoutMode = RedirectMode.Append;
 							stdoutFile = arguments[++i];
 							continue;
 						}
 
 						if (arg == "2>") {
-							stderrMode = RedirectMode.Overwrite;
+							echoStderrMode = RedirectMode.Overwrite;
 							stderrFile = arguments[++i];
 							continue;
 						}
 
 						if (arg == "2>>") {
-							stderrMode = RedirectMode.Append;
+							echoStderrMode = RedirectMode.Append;
 							stderrFile = arguments[++i];
 							continue;
 						}
@@ -94,17 +100,17 @@ class Program
 						echoArgs.Add(arg);
 					}
 
-					string output = string.Join(" ", echoArgs) + "\n";
+					string echoOutput = string.Join(" ", echoArgs) + "\n";
 
-					if (stdoutMode == RedirectMode.None) {
-						Console.Write(output);
+					if (echoStdoutMode == RedirectMode.None) {
+						Console.Write(echoOutput);
 					}
 					else {
-						_WriteOutput(output, stdoutMode, stdoutFile);
+						_WriteOutput(echoOutput, echoStdoutMode, stdoutFile);
 					}
 
-					if (stderrMode != RedirectMode.None) {
-						_WriteOutput(string.Empty, stderrMode, stderrFile);
+					if (echoStderrMode != RedirectMode.None) {
+						_WriteOutput(string.Empty, echoStderrMode, stderrFile);
 					}
 
 					continue;
@@ -184,11 +190,9 @@ class Program
 
 				if (command.Equals("jobs")) {
 					// List all background jobs
-					BackgroundJobManager.PrintJobs();					
-
+					BackgroundJobManager.PrintJobs();
 					continue;
 				}
-
 
 				if (command.Equals("exit")) {
 					break;
@@ -197,88 +201,48 @@ class Program
 
 				// real command management
 				var tokens = _ParseArguments(command);
-
 				string commandName = tokens[0];
 
-				string commandPath = _FindCommandInPath(commandName);
-				if (!string.IsNullOrEmpty(commandPath)) {
-					var psi = new ProcessStartInfo();
-					psi.FileName = commandName; //The system resolves the path, so we can just use the command name
+				if (string.IsNullOrEmpty(_FindCommandInPath(commandName))) {
+					Console.WriteLine($"{command}: command not found");
+					continue;
+				}
 
-					string outputFilename = string.Empty;
-					string errorFilename = string.Empty;
-					RedirectMode stdoutMode = RedirectMode.None;
-					RedirectMode stderrMode = RedirectMode.None;
+				var psi = _BuildProcessStartInfo(
+					tokens,
+					out RedirectMode stdoutMode, out string outputFilename,
+					out RedirectMode stderrMode, out string errorFilename);
 
+				if (isBackground) {
+					// Background job: no redirection, no waiting. Output goes straight to
+					// the terminal and the shell returns to the prompt immediately.
+					psi.RedirectStandardOutput = false;
+					psi.RedirectStandardError = false;
 
-					for (int i = 1; i < tokens.Count; i++) {
-						var arg = tokens[i];
+					var bgProcess = Process.Start(psi);
+					int jobId = BackgroundJobManager.AddJob(bgProcess, command);
 
-						if (arg == "1>" || arg == ">") {
-							stdoutMode = RedirectMode.Overwrite;
-							outputFilename = tokens[++i];
-							continue;
-						}
+					Console.WriteLine($"[{jobId}] {bgProcess.Id}");
+					continue;
+				}
 
-						if (arg == "1>>" || arg == ">>") {
-							stdoutMode = RedirectMode.Append;
-							outputFilename = tokens[++i];
-							continue;
-						}
+				// Foreground: existing blocking behavior.
+				psi.RedirectStandardOutput = true;
+				psi.RedirectStandardError = true;
 
-						if (arg == "2>") {
-							stderrMode = RedirectMode.Overwrite;
-							errorFilename = tokens[++i];
-							continue;
-						}
+				using var process = Process.Start(psi);
 
-						if (arg == "2>>") {
-							stderrMode = RedirectMode.Append;
-							errorFilename = tokens[++i];
-							continue;
-						}
+				string output = process.StandardOutput.ReadToEnd();
+				string error = process.StandardError.ReadToEnd();
+				process.WaitForExit();
 
-						psi.ArgumentList.Add(arg);
-					}
+				_WriteOutput(output, stdoutMode, outputFilename);
 
-					psi.UseShellExecute = false;
-
-					if (isBackground) {
-						// Background job: do not redirect or wait. Output goes straight to the
-						// terminal, same as bash's default behavior for '&' commands, and the
-						// shell must return to the prompt immediately.
-						psi.RedirectStandardOutput = false;
-						psi.RedirectStandardError = false;
-
-						var process = Process.Start(psi);
-						int jobId = BackgroundJobManager.AddJob(process, command);
-
-						Console.WriteLine($"[{jobId}] {process.Id}");
-						continue;
-					}
-
-					// Foreground job: existing behavior (redirect, wait, write output).
-					psi.RedirectStandardOutput = true;
-					psi.RedirectStandardError = true;
-
-					using var fgProcess = Process.Start(psi);
-
-					string output = fgProcess.StandardOutput.ReadToEnd();
-					string error = fgProcess.StandardError.ReadToEnd();
-					fgProcess.WaitForExit();
-
-					_WriteOutput(output, stdoutMode, outputFilename);
-
-					if (stderrMode == RedirectMode.None) {
-						Console.Error.Write(error);
-					}
-					else {
-						_WriteOutput(error, stderrMode, errorFilename);
-					}
-
+				if (stderrMode == RedirectMode.None) {
+					Console.Error.Write(error);
 				}
 				else {
-					Console.WriteLine($"{command}: command not found");
+					_WriteOutput(error, stderrMode, errorFilename);
 				}
 
 			}
@@ -305,6 +269,52 @@ class Program
 		if (!string.IsNullOrEmpty(_savedTtySettings)) {
 			_RunSttyCommand(_savedTtySettings);
 		}
+	}
+
+	// Returns true if the command line contains a '|' outside of any quotes.
+	private static bool _ContainsUnquotedPipe(string command)
+	{
+		bool inSingleQuotes = false;
+		bool inDoubleQuotes = false;
+
+		for (int i = 0; i < command.Length; i++) {
+			char c = command[i];
+
+			if (!inDoubleQuotes && c == '\'') inSingleQuotes = !inSingleQuotes;
+			else if (!inSingleQuotes && c == '"') inDoubleQuotes = !inDoubleQuotes;
+			else if (!inSingleQuotes && !inDoubleQuotes && c == '|') return true;
+		}
+
+		return false;
+	}
+
+	// Splits a command line into pipeline stages on unquoted '|' characters.
+	// Each returned segment is the raw, untrimmed text of one stage.
+	private static List<string> _SplitPipelineStages(string command)
+	{
+		var stages = new List<string>();
+		var current = new StringBuilder();
+
+		bool inSingleQuotes = false;
+		bool inDoubleQuotes = false;
+
+		for (int i = 0; i < command.Length; i++) {
+			char c = command[i];
+
+			if (!inDoubleQuotes && c == '\'') inSingleQuotes = !inSingleQuotes;
+			else if (!inSingleQuotes && c == '"') inDoubleQuotes = !inDoubleQuotes;
+
+			if (!inSingleQuotes && !inDoubleQuotes && c == '|') {
+				stages.Add(current.ToString().Trim());
+				current.Clear();
+				continue;
+			}
+
+			current.Append(c);
+		}
+
+		stages.Add(current.ToString().Trim());
+		return stages;
 	}
 
 	// Run an stty command against the current controlling terminal and
@@ -702,135 +712,140 @@ class Program
 			return string.Empty;
 		}
 	}
-}
 
-// Possible states of a tracked job.
-enum JobStatus
-{
-	Running,
-	Done
-}
-
-// Represents a single background process tracked by the shell.
-class Job
-{
-	public int Id { get; }
-	public Process Process { get; }
-	public string CommandLine { get; }
-	public JobStatus Status { get; set; } = JobStatus.Running;
-
-	public Job(int id, Process process, string commandLine)
+	/// <summary>
+	/// Executes a pipeline of external commands connected by '|'. Standard output
+	/// of each stage feeds standard input of the next. If isBackground is true,
+	/// the whole pipeline is registered as a single job and the shell returns to
+	/// the prompt immediately without waiting for the last stage.
+	/// </summary>
+	/// <param name="command"></param>
+	/// <param name="isBackground"></param>
+	private static void _ExecutePipeline(string command, bool isBackground)
 	{
-		Id = id;
-		Process = process;
-		CommandLine = commandLine;
-	}
-}
+		var stageTexts = _SplitPipelineStages(command);
+		var processes = new Process[stageTexts.Count];
 
-// Keeps track of all background jobs started with '&'.
-class BackgroundJobManager
-{
-	private static readonly List<Job> _jobs = new();
+		for (int i = 0; i < stageTexts.Count; i++) {
+			var tokens = _ParseArguments(stageTexts[i]);
 
-	// Register a newly started background process and return its assigned job number.
-	public static int AddJob(Process process, string commandLine)
-	{
-		int jobId = _jobs.Count > 0 ? _jobs.Max(j => j.Id) + 1 : 1;
-		_jobs.Add(new Job(jobId, process, commandLine));
-		return jobId;
-	}
+			if (tokens.Count == 0) {
+				Console.WriteLine("syntax error: empty pipeline stage");
+				return;
+			}
 
-	// Return a snapshot of all currently tracked jobs, in job-number order.
-	public static List<Job> GetJobs()
-	{
-		return _jobs.OrderBy(j => j.Id).ToList();
-	}
+			if (string.IsNullOrEmpty(_FindCommandInPath(tokens[0]))) {
+				Console.WriteLine($"{tokens[0]}: command not found");
+				return;
+			}
 
-	// Remove a job from the tracked list, e.g. once it has finished and been reported.
-	public static void RemoveJob(int jobId)
-	{
-		_jobs.RemoveAll(j => j.Id == jobId);
-	}
+			var psi = _BuildProcessStartInfo(
+				tokens,
+				out RedirectMode stdoutMode, out string stdoutFile,
+				out RedirectMode stderrMode, out string stderrFile);
 
-	// Find a job by its id, or null if it isn't tracked.
-	public static Job? GetJob(int jobId)
-	{
-		return _jobs.FirstOrDefault(j => j.Id == jobId);
+			bool isFirst = i == 0;
+			bool isLast = i == stageTexts.Count - 1;
+
+			psi.RedirectStandardInput = !isFirst;
+			psi.RedirectStandardOutput = !isLast || stdoutMode != RedirectMode.None;
+			psi.RedirectStandardError = stderrMode != RedirectMode.None;
+
+			var process = Process.Start(psi);
+			processes[i] = process;
+
+			if (!isLast && stdoutMode == RedirectMode.None) {
+				int nextIndex = i;
+				var sourceStream = process.StandardOutput.BaseStream;
+
+				Task.Run(() => {
+					try {
+						var destStream = processes[nextIndex + 1].StandardInput.BaseStream;
+						sourceStream.CopyTo(destStream);
+						processes[nextIndex + 1].StandardInput.Close();
+					}
+					catch (IOException) { /* downstream stage exited early */ }
+					catch (ObjectDisposedException) { /* same as above */ }
+				});
+			}
+
+			// These blocking reads only make sense for a foreground pipeline;
+			// in the background case we skip them entirely (see below).
+			if (!isBackground) {
+				if (isLast && stdoutMode != RedirectMode.None) {
+					string output = process.StandardOutput.ReadToEnd();
+					process.WaitForExit();
+					_WriteOutput(output, stdoutMode, stdoutFile);
+				}
+
+				if (stderrMode != RedirectMode.None) {
+					string error = process.StandardError.ReadToEnd();
+					_WriteOutput(error, stderrMode, stderrFile);
+				}
+			}
+		}
+
+		if (isBackground) {
+			// Register the pipeline as a single job, keyed on its last stage —
+			// matching bash, which reports the last process's PID for a
+			// backgrounded pipeline.
+			var lastProcess = processes[^1];
+			int jobId = BackgroundJobManager.AddJob(lastProcess, command);
+
+			Console.WriteLine($"[{jobId}] {lastProcess.Id}");
+			return;
+		}
+
+		// Foreground: only the last stage is awaited, so an earlier still-running
+		// stage (e.g. "tail -f") does not block the shell.
+		processes[^1].WaitForExit();
 	}
 
 	/// <summary>
-	/// Refresh job statuses, print every currently tracked job in bash's
-	/// "jobs" format, then reap (remove) any job that has just finished.
+	/// Parses a single command's tokens into a ready-to-start ProcessStartInfo,
+	/// extracting any redirection operators (>, >>, 1>, 1>>, 2>, 2>>) out of the
+	/// argument list. Used both for standalone commands and for each stage of a
+	/// pipeline
 	/// </summary>
-	public static	void PrintJobs()
+	/// <param name="tokens">Separated list of command-line tokens</param>
+	/// <param name="stdoutMode">Behavior for handling stdout redirection</param>
+	/// <param name="stdoutFile">File to redirect stdout to, if applicable</param>
+	/// <param name="stderrMode">Behavior for handling stderr redirection</param>
+	/// <param name="stderrFile">File to redirect stderr to, if applicable</param>
+	/// <returns></returns>
+	private static ProcessStartInfo _BuildProcessStartInfo(
+		List<string> tokens,
+		out RedirectMode stdoutMode,
+		out string stdoutFile,
+		out RedirectMode stderrMode,
+		out string stderrFile)
 	{
-		// Detect jobs whose process has exited since the last check, without
-		// blocking: WaitForExit() would wait, HasExited only polls the state.
-		foreach (var job in _jobs.Where(j => j.Status == JobStatus.Running)) {
-			if (job.Process.HasExited) {
-				job.Status = JobStatus.Done;
-			}
+		stdoutMode = RedirectMode.None;
+		stderrMode = RedirectMode.None;
+		stdoutFile = string.Empty;
+		stderrFile = string.Empty;
+
+		string commandName = tokens[0];
+
+		var psi = new ProcessStartInfo {
+			FileName = commandName,
+			UseShellExecute = false
+		};
+
+		// Start at 1: tokens[0] is the command name, already used as FileName,
+		// and must not be re-added as an argument.
+		for (int i = 1; i < tokens.Count; i++) {
+			string arg = tokens[i];
+
+			if (arg == "1>" || arg == ">") { stdoutMode = RedirectMode.Overwrite; stdoutFile = tokens[++i]; continue; }
+			if (arg == "1>>" || arg == ">>") { stdoutMode = RedirectMode.Append; stdoutFile = tokens[++i]; continue; }
+			if (arg == "2>") { stderrMode = RedirectMode.Overwrite; stderrFile = tokens[++i]; continue; }
+			if (arg == "2>>") { stderrMode = RedirectMode.Append; stderrFile = tokens[++i]; continue; }
+
+			psi.ArgumentList.Add(arg);
 		}
 
-		var jobList = GetJobsWithIndicators();
-
-		if (jobList.Any()) {
-			foreach (var (job, indicator) in jobList) {
-				Console.WriteLine($"[{job.Id}]{indicator}  {job.Status.ToString().PadRight(24)} {job.CommandLine}");
-			}
-		}
-
-		// Reap: remove jobs that were just reported as Done, so they don't
-		// appear again on the next "jobs" call.
-		var doneIds = _jobs.Where(j => j.Status == JobStatus.Done)
-							.Select(j => j.Id)
-							.ToList();
-
-		foreach (var id in doneIds) {
-			RemoveJob(id);
-		}
-	}
-
-	// Returns the currently tracked jobs paired with their bash-style indicator:
-	// '+' for the most recently started job (the "current" job),
-	// '-' for the second most recently started job (the "previous" job),
-	// ' ' for all others. Order follows job number, matching bash's "jobs" output.
-	public static List<(Job Job, char Indicator)> GetJobsWithIndicators()
-	{
-		var ordered = GetJobs(); // already sorted by Id ascending
-
-		var result = new List<(Job, char)>();
-
-		for (int i = 0; i < ordered.Count; i++) {
-			char indicator = ' ';
-
-			if (i == ordered.Count - 1) {
-				indicator = '+';
-			}
-			else if (i == ordered.Count - 2) {
-				indicator = '-';
-			}
-
-			result.Add((ordered[i], indicator));
-		}
-
-		return result;
-	}
-
-	// Check every still-Running job to see if its process has exited, and flip
-	// its status to Done accordingly. Returns the jobs that transitioned to
-	// Done during this call, so the caller can print a one-time notification.
-	public static List<Job> RefreshStatuses()
-	{
-		var newlyFinished = new List<Job>();
-
-		foreach (var job in _jobs.Where(j => j.Status == JobStatus.Running)) {
-			if (job.Process.HasExited) {
-				job.Status = JobStatus.Done;
-				newlyFinished.Add(job);
-			}
-		}
-
-		return newlyFinished;
+		return psi;
 	}
 }
+
