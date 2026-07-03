@@ -290,6 +290,31 @@ class Program
 						.ToList();
 				}
 				else {
+					//custom completion
+					string commandName = line[..lastSpace];
+
+					if (customCompletions.TryGetValue(commandName, out var script)) {
+						var psi = new ProcessStartInfo {
+							FileName = script,
+							RedirectStandardOutput = true,
+							UseShellExecute = false
+						};
+
+						using var process = Process.Start(psi);
+
+						string completion = process.StandardOutput.ReadToEnd()
+							.TrimEnd('\r', '\n');
+
+						process.WaitForExit();
+
+						matches = new List<string> { completion };
+						prefix = line[(lastSpace + 1)..];
+
+						Complete(matches, prefix, ".", buffer, ref previousWasTab);
+						continue;
+					}
+
+
 					// Filename completion
 					string token = line[(lastSpace + 1)..];
 
