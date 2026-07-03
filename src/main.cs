@@ -199,10 +199,10 @@ class Program
 
 				}
 
-				// real command management
+				// Real command management.
 				var tokens = _ParseArguments(command);
 				string commandName = tokens[0];
-				Console.WriteLine($"Executing command: {commandName}");
+
 				if (string.IsNullOrEmpty(_FindCommandInPath(commandName))) {
 					Console.WriteLine($"{command}: command not found");
 					continue;
