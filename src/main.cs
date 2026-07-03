@@ -10,7 +10,6 @@ class Program
 	static void Main()
 	{
 		_EnableRawTerminalMode();
-		var jobManager = new BackgroundJobManager();
 
 		try {
 
@@ -35,9 +34,9 @@ class Program
 				// Report any background job that finished since the last prompt,
 				// matching bash's "[n]+  Done   command" notification, then drop it
 				// from tracking since it has already been reported.
-				foreach (var finishedJob in jobManager.RefreshStatuses()) {
+				foreach (var finishedJob in BackgroundJobManager.RefreshStatuses()) {
 					Console.WriteLine($"[{finishedJob.Id}]+  Done                    {finishedJob.CommandLine}");
-					jobManager.RemoveJob(finishedJob.Id);
+					BackgroundJobManager.RemoveJob(finishedJob.Id);
 				}
 				Console.Write("$ ");
 
@@ -185,7 +184,7 @@ class Program
 
 				if (command.Equals("jobs")) {
 					// List all background jobs
-					jobManager.PrintJobs();					
+					BackgroundJobManager.PrintJobs();					
 
 					continue;
 				}
@@ -252,7 +251,7 @@ class Program
 						psi.RedirectStandardError = false;
 
 						var process = Process.Start(psi);
-						int jobId = jobManager.AddJob(process, command);
+						int jobId = BackgroundJobManager.AddJob(process, command);
 
 						Console.WriteLine($"[{jobId}] {process.Id}");
 						continue;
@@ -731,31 +730,30 @@ class Job
 // Keeps track of all background jobs started with '&'.
 class BackgroundJobManager
 {
-	private readonly List<Job> _jobs = new();
-	private int _nextJobId = 1;
+	private static readonly List<Job> _jobs = new();
 
 	// Register a newly started background process and return its assigned job number.
-	public int AddJob(Process process, string commandLine)
+	public static int AddJob(Process process, string commandLine)
 	{
-		int jobId = _nextJobId++;
+		int jobId = _jobs.Count > 0 ? _jobs.Max(j => j.Id) + 1 : 1;
 		_jobs.Add(new Job(jobId, process, commandLine));
 		return jobId;
 	}
 
 	// Return a snapshot of all currently tracked jobs, in job-number order.
-	public List<Job> GetJobs()
+	public static List<Job> GetJobs()
 	{
 		return _jobs.OrderBy(j => j.Id).ToList();
 	}
 
 	// Remove a job from the tracked list, e.g. once it has finished and been reported.
-	public void RemoveJob(int jobId)
+	public static void RemoveJob(int jobId)
 	{
 		_jobs.RemoveAll(j => j.Id == jobId);
 	}
 
 	// Find a job by its id, or null if it isn't tracked.
-	public Job? GetJob(int jobId)
+	public static Job? GetJob(int jobId)
 	{
 		return _jobs.FirstOrDefault(j => j.Id == jobId);
 	}
@@ -764,7 +762,7 @@ class BackgroundJobManager
 	/// Refresh job statuses, print every currently tracked job in bash's
 	/// "jobs" format, then reap (remove) any job that has just finished.
 	/// </summary>
-	public void PrintJobs()
+	public static	void PrintJobs()
 	{
 		// Detect jobs whose process has exited since the last check, without
 		// blocking: WaitForExit() would wait, HasExited only polls the state.
@@ -797,7 +795,7 @@ class BackgroundJobManager
 	// '+' for the most recently started job (the "current" job),
 	// '-' for the second most recently started job (the "previous" job),
 	// ' ' for all others. Order follows job number, matching bash's "jobs" output.
-	public List<(Job Job, char Indicator)> GetJobsWithIndicators()
+	public static List<(Job Job, char Indicator)> GetJobsWithIndicators()
 	{
 		var ordered = GetJobs(); // already sorted by Id ascending
 
@@ -822,7 +820,7 @@ class BackgroundJobManager
 	// Check every still-Running job to see if its process has exited, and flip
 	// its status to Done accordingly. Returns the jobs that transitioned to
 	// Done during this call, so the caller can print a one-time notification.
-	public List<Job> RefreshStatuses()
+	public static List<Job> RefreshStatuses()
 	{
 		var newlyFinished = new List<Job>();
 
