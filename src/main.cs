@@ -4,233 +4,279 @@ using System.Text;
 
 class Program
 {
+	// Path used to restore the terminal to its original settings on exit.
+	private static string _savedTtySettings = string.Empty;
+
 	static void Main()
 	{
-		string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete" };
-		Dictionary<string, string> customCompletions = new();
+		_EnableRawTerminalMode();
 
-		var allCommands = new string[builtInCommands.Length];
-		builtInCommands.CopyTo(allCommands, 0);
+		try {
 
-		string[] pathDirectories = Environment.GetEnvironmentVariable("PATH").Split(':');
+			string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete" };
+			Dictionary<string, string> customCompletions = new();
 
-		foreach (string pathDirectory in pathDirectories) {
-			if (!Directory.Exists(pathDirectory))
-				continue;
+			var allCommands = new string[builtInCommands.Length];
+			builtInCommands.CopyTo(allCommands, 0);
 
-			foreach (string file in Directory.GetFiles(pathDirectory)) {
-				allCommands = allCommands.Append(Path.GetFileName(file)).Distinct().ToArray();
-			}
-		}
+			string[] pathDirectories = Environment.GetEnvironmentVariable("PATH").Split(':');
 
-		while (true) {
-			Console.Write("$ ");
+			foreach (string pathDirectory in pathDirectories) {
+				if (!Directory.Exists(pathDirectory))
+					continue;
 
-			string command = _ReadCommandLine(allCommands, customCompletions);
-			//string command = Console.ReadLine();
-
-			if (command.StartsWith("echo")) {
-				string echoArguments = command.Substring(5);
-				var arguments = _ParseArguments(echoArguments);
-
-				RedirectMode stdoutMode = RedirectMode.None;
-				RedirectMode stderrMode = RedirectMode.None;
-
-				string stdoutFile = string.Empty;
-				string stderrFile = string.Empty;
-
-				var echoArgs = new List<string>();
-
-				for (int i = 0; i < arguments.Count; i++) {
-					string arg = arguments[i];
-
-					if (arg == ">" || arg == "1>") {
-						stdoutMode = RedirectMode.Overwrite;
-						stdoutFile = arguments[++i];
-						continue;
-					}
-
-					if (arg == ">>" || arg == "1>>") {
-						stdoutMode = RedirectMode.Append;
-						stdoutFile = arguments[++i];
-						continue;
-					}
-
-					if (arg == "2>") {
-						stderrMode = RedirectMode.Overwrite;
-						stderrFile = arguments[++i];
-						continue;
-					}
-
-					if (arg == "2>>") {
-						stderrMode = RedirectMode.Append;
-						stderrFile = arguments[++i];
-						continue;
-					}
-
-					echoArgs.Add(arg);
+				foreach (string file in Directory.GetFiles(pathDirectory)) {
+					allCommands = allCommands.Append(Path.GetFileName(file)).Distinct().ToArray();
 				}
-
-				string output = string.Join(" ", echoArgs) + "\n";
-
-				if (stdoutMode == RedirectMode.None) {
-					Console.Write(output);
-				}
-				else {
-					_WriteOutput(output, stdoutMode, stdoutFile);
-				}
-
-				if (stderrMode != RedirectMode.None) {
-					_WriteOutput(string.Empty, stderrMode, stderrFile);
-				}
-
-				continue;
 			}
 
-			if (command.StartsWith("type")) {
+			while (true) {
+				Console.Write("$ ");
 
-				string specifiedCommand = command.Split(" ")[1];
+				string command = _ReadCommandLine(allCommands, customCompletions);
+				//string command = Console.ReadLine();
 
-				if (builtInCommands.Contains(specifiedCommand)) {
-					Console.WriteLine($"{specifiedCommand} is a shell builtin");
-				}
-				else {
-					string path = _FindCommandInPath(specifiedCommand);
+				if (command.StartsWith("echo")) {
+					string echoArguments = command.Substring(5);
+					var arguments = _ParseArguments(echoArguments);
 
-					if (string.IsNullOrEmpty(path))
-						Console.WriteLine($"{specifiedCommand}: not found");
-					else
-						Console.WriteLine($"{specifiedCommand} is {path}");
-				}
+					RedirectMode stdoutMode = RedirectMode.None;
+					RedirectMode stderrMode = RedirectMode.None;
 
-				continue;
-			}
+					string stdoutFile = string.Empty;
+					string stderrFile = string.Empty;
 
-			if (command.StartsWith("pwd")) {
-				Console.WriteLine(Directory.GetCurrentDirectory());
-				continue;
-			}
+					var echoArgs = new List<string>();
 
-			if (command.StartsWith("cd")) {
-				string[] cdArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-				if (cdArgs.Length > 1) {
-					if (cdArgs[1] == "~") {
-						Directory.SetCurrentDirectory(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+					for (int i = 0; i < arguments.Count; i++) {
+						string arg = arguments[i];
+
+						if (arg == ">" || arg == "1>") {
+							stdoutMode = RedirectMode.Overwrite;
+							stdoutFile = arguments[++i];
+							continue;
+						}
+
+						if (arg == ">>" || arg == "1>>") {
+							stdoutMode = RedirectMode.Append;
+							stdoutFile = arguments[++i];
+							continue;
+						}
+
+						if (arg == "2>") {
+							stderrMode = RedirectMode.Overwrite;
+							stderrFile = arguments[++i];
+							continue;
+						}
+
+						if (arg == "2>>") {
+							stderrMode = RedirectMode.Append;
+							stderrFile = arguments[++i];
+							continue;
+						}
+
+						echoArgs.Add(arg);
 					}
-					else if (Directory.Exists(cdArgs[1])) {
-						Directory.SetCurrentDirectory(cdArgs[1]);
+
+					string output = string.Join(" ", echoArgs) + "\n";
+
+					if (stdoutMode == RedirectMode.None) {
+						Console.Write(output);
 					}
 					else {
-						Console.WriteLine($"cd: {cdArgs[1]}: No such file or directory");
+						_WriteOutput(output, stdoutMode, stdoutFile);
 					}
+
+					if (stderrMode != RedirectMode.None) {
+						_WriteOutput(string.Empty, stderrMode, stderrFile);
+					}
+
+					continue;
 				}
 
-				continue;
-			}
+				if (command.StartsWith("type")) {
 
-			if (command.StartsWith("complete")) {
-				string[] completeArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-				if (completeArgs.Length > 1) {
-					if (completeArgs[1] == "-p") {
-						if (completeArgs.Length > 2) {
-							string cmd = completeArgs[2];
+					string specifiedCommand = command.Split(" ")[1];
 
-							if (customCompletions.TryGetValue(cmd, out var script)) {
-								Console.WriteLine($"complete -C '{script}' {cmd}");
-							}
-							else {
-								Console.WriteLine($"complete: {cmd}: no completion specification");
-							}
+					if (builtInCommands.Contains(specifiedCommand)) {
+						Console.WriteLine($"{specifiedCommand} is a shell builtin");
+					}
+					else {
+						string path = _FindCommandInPath(specifiedCommand);
+
+						if (string.IsNullOrEmpty(path))
+							Console.WriteLine($"{specifiedCommand}: not found");
+						else
+							Console.WriteLine($"{specifiedCommand} is {path}");
+					}
+
+					continue;
+				}
+
+				if (command.StartsWith("pwd")) {
+					Console.WriteLine(Directory.GetCurrentDirectory());
+					continue;
+				}
+
+				if (command.StartsWith("cd")) {
+					string[] cdArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+					if (cdArgs.Length > 1) {
+						if (cdArgs[1] == "~") {
+							Directory.SetCurrentDirectory(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+						}
+						else if (Directory.Exists(cdArgs[1])) {
+							Directory.SetCurrentDirectory(cdArgs[1]);
+						}
+						else {
+							Console.WriteLine($"cd: {cdArgs[1]}: No such file or directory");
 						}
 					}
 
-					if (completeArgs[1].ToLower() == "-c") {
-						if (completeArgs.Length > 2) {
-							customCompletions[completeArgs[3]] = $"{completeArgs[2]}";
+					continue;
+				}
+
+				if (command.StartsWith("complete")) {
+					string[] completeArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+					if (completeArgs.Length > 1) {
+						if (completeArgs[1] == "-p") {
+							if (completeArgs.Length > 2) {
+								string cmd = completeArgs[2];
+
+								if (customCompletions.TryGetValue(cmd, out var script)) {
+									Console.WriteLine($"complete -C '{script}' {cmd}");
+								}
+								else {
+									Console.WriteLine($"complete: {cmd}: no completion specification");
+								}
+							}
+						}
+
+						if (completeArgs[1].ToLower() == "-c") {
+							if (completeArgs.Length > 2) {
+								customCompletions[completeArgs[3]] = $"{completeArgs[2]}";
+							}
 						}
 					}
-				}
-				continue;
-			}
-
-
-			if (command.Equals("exit")) {
-				break;
-
-			}
-
-			// real command management
-			var tokens = _ParseArguments(command);
-
-			string commandName = tokens[0];
-
-			string commandPath = _FindCommandInPath(commandName);
-			if (!string.IsNullOrEmpty(commandPath)) {
-				var psi = new ProcessStartInfo();
-				psi.FileName = commandName; //The system resolves the path, so we can just use the command name
-
-				string outputFilename = string.Empty;
-				string errorFilename = string.Empty;
-				RedirectMode stdoutMode = RedirectMode.None;
-				RedirectMode stderrMode = RedirectMode.None;
-
-
-				for (int i = 1; i < tokens.Count; i++) {
-					var arg = tokens[i];
-
-					if (arg == "1>" || arg == ">") {
-						stdoutMode = RedirectMode.Overwrite;
-						outputFilename = tokens[++i];
-						continue;
-					}
-
-					if (arg == "1>>" || arg == ">>") {
-						stdoutMode = RedirectMode.Append;
-						outputFilename = tokens[++i];
-						continue;
-					}
-
-					if (arg == "2>") {
-						stderrMode = RedirectMode.Overwrite;
-						errorFilename = tokens[++i];
-						continue;
-					}
-
-					if (arg == "2>>") {
-						stderrMode = RedirectMode.Append;
-						errorFilename = tokens[++i];
-						continue;
-					}
-
-					psi.ArgumentList.Add(arg);
+					continue;
 				}
 
-				psi.RedirectStandardOutput = true;
-				psi.RedirectStandardError = true;
-				psi.UseShellExecute = false;
 
-				using var process = Process.Start(psi);
+				if (command.Equals("exit")) {
+					break;
 
-				string output = process.StandardOutput.ReadToEnd();
-				string error = process.StandardError.ReadToEnd();
-				process.WaitForExit();
+				}
 
-				_WriteOutput(output, stdoutMode, outputFilename);
+				// real command management
+				var tokens = _ParseArguments(command);
 
-				if (stderrMode == RedirectMode.None) {
-					Console.Error.Write(error);
+				string commandName = tokens[0];
+
+				string commandPath = _FindCommandInPath(commandName);
+				if (!string.IsNullOrEmpty(commandPath)) {
+					var psi = new ProcessStartInfo();
+					psi.FileName = commandName; //The system resolves the path, so we can just use the command name
+
+					string outputFilename = string.Empty;
+					string errorFilename = string.Empty;
+					RedirectMode stdoutMode = RedirectMode.None;
+					RedirectMode stderrMode = RedirectMode.None;
+
+
+					for (int i = 1; i < tokens.Count; i++) {
+						var arg = tokens[i];
+
+						if (arg == "1>" || arg == ">") {
+							stdoutMode = RedirectMode.Overwrite;
+							outputFilename = tokens[++i];
+							continue;
+						}
+
+						if (arg == "1>>" || arg == ">>") {
+							stdoutMode = RedirectMode.Append;
+							outputFilename = tokens[++i];
+							continue;
+						}
+
+						if (arg == "2>") {
+							stderrMode = RedirectMode.Overwrite;
+							errorFilename = tokens[++i];
+							continue;
+						}
+
+						if (arg == "2>>") {
+							stderrMode = RedirectMode.Append;
+							errorFilename = tokens[++i];
+							continue;
+						}
+
+						psi.ArgumentList.Add(arg);
+					}
+
+					psi.RedirectStandardOutput = true;
+					psi.RedirectStandardError = true;
+					psi.UseShellExecute = false;
+
+					using var process = Process.Start(psi);
+
+					string output = process.StandardOutput.ReadToEnd();
+					string error = process.StandardError.ReadToEnd();
+					process.WaitForExit();
+
+					_WriteOutput(output, stdoutMode, outputFilename);
+
+					if (stderrMode == RedirectMode.None) {
+						Console.Error.Write(error);
+					}
+					else {
+						_WriteOutput(error, stderrMode, errorFilename);
+					}
 				}
 				else {
-					_WriteOutput(error, stderrMode, errorFilename);
+					Console.WriteLine($"{command}: command not found");
 				}
-			}
-			else {
-				Console.WriteLine($"{command}: command not found");
+
 			}
 
 		}
+		finally {
+			_RestoreTerminalMode();
+		}
+	}
 
+	// Disable canonical mode and local echo on the controlling terminal.
+	// We read input one keystroke at a time (Console.ReadKey) and echo it
+	// ourselves in _ReadCommandLine, so kernel-level echo must be turned off
+	// to avoid every typed line being displayed twice.
+	private static void _EnableRawTerminalMode()
+	{
+		_savedTtySettings = _RunSttyCommand("-g");
+		_RunSttyCommand("-echo -icanon min 1 time 0");
+	}
 
+	// Restore the terminal settings that were active before we changed them.
+	private static void _RestoreTerminalMode()
+	{
+		if (!string.IsNullOrEmpty(_savedTtySettings)) {
+			_RunSttyCommand(_savedTtySettings);
+		}
+	}
+
+	// Run an stty command against the current controlling terminal and
+	// return its trimmed stdout (used both to query and to apply settings).
+	private static string _RunSttyCommand(string arguments)
+	{
+		var psi = new ProcessStartInfo {
+			FileName = "stty",
+			Arguments = arguments,
+			UseShellExecute = false,
+			RedirectStandardOutput = true
+		};
+
+		using var process = Process.Start(psi);
+		string output = process.StandardOutput.ReadToEnd().Trim();
+		process.WaitForExit();
+
+		return output;
 	}
 
 	private static string _ReadCommandLine(string[] allCommands, Dictionary<string, string> customCompletions)
