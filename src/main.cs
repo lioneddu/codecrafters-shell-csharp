@@ -158,79 +158,93 @@ class Program
 				break;
 
 			}
-			// real command management
 
+			// real command management
 			var tokens = _ParseArguments(command);
 
 			string commandName = tokens[0];
 
-			string commandPath = _FindCommandInPath(commandName);
-			if (!string.IsNullOrEmpty(commandPath)) {
-				var psi = new ProcessStartInfo();
-				psi.FileName = commandName; //The system resolves the path, so we can just use the command name
+			var psi = new ProcessStartInfo();
+			psi.FileName = commandName;
+			psi.UseShellExecute = false;
+			psi.RedirectStandardOutput = true;
+			psi.RedirectStandardError = true;
 
-				string outputFilename = string.Empty;
-				string errorFilename = string.Empty;
-				RedirectMode stdoutMode = RedirectMode.None;
-				RedirectMode stderrMode = RedirectMode.None;
+			string stdoutFile = string.Empty;
+			string stderrFile = string.Empty;
 
+			RedirectMode stdoutMode = RedirectMode.None;
+			RedirectMode stderrMode = RedirectMode.None;
 
-				for (int i = 0; i < tokens.Count; i++) {
-					var arg = tokens[i];
+			// IMPORTANT: start from 1 (skip command name)
+			for (int i = 1; i < tokens.Count; i++) {
 
-					if (arg == "1>" || arg == ">") {
-						stdoutMode = RedirectMode.Overwrite;
-						outputFilename = tokens[++i];
-						continue;
-					}
+				string arg = tokens[i];
 
-					if (arg == "1>>" || arg == ">>") {
-						stdoutMode = RedirectMode.Append;
-						outputFilename = tokens[++i];
-						continue;
-					}
-
-					if (arg == "2>") {
-						stderrMode = RedirectMode.Overwrite;
-						errorFilename = tokens[++i];
-						continue;
-					}
-
-					if (arg == "2>>") {
-						stderrMode = RedirectMode.Append;
-						errorFilename = tokens[++i];
-						continue;
-					}
-
-					psi.ArgumentList.Add(arg);
+				// -------------------------
+				// STDOUT REDIRECT
+				// -------------------------
+				if (arg == ">" || arg == "1>") {
+					stdoutMode = RedirectMode.Overwrite;
+					stdoutFile = tokens[++i];
+					continue;
 				}
 
-				psi.RedirectStandardOutput = true;
-				psi.RedirectStandardError = true;
-				psi.UseShellExecute = false;
-
-				using var process = Process.Start(psi);
-
-				string output = process.StandardOutput.ReadToEnd();
-				string error = process.StandardError.ReadToEnd();
-				process.WaitForExit();
-
-				_WriteOutput(output, stdoutMode, outputFilename);
-
-				if (stderrMode == RedirectMode.None) {
-					Console.Error.Write(error);
+				if (arg == ">>" || arg == "1>>") {
+					stdoutMode = RedirectMode.Append;
+					stdoutFile = tokens[++i];
+					continue;
 				}
-				else {
-					_WriteOutput(error, stderrMode, errorFilename);
+
+				// -------------------------
+				// STDERR REDIRECT
+				// -------------------------
+				if (arg == "2>") {
+					stderrMode = RedirectMode.Overwrite;
+					stderrFile = tokens[++i];
+					continue;
 				}
+
+				if (arg == "2>>") {
+					stderrMode = RedirectMode.Append;
+					stderrFile = tokens[++i];
+					continue;
+				}
+
+				// -------------------------
+				// NORMAL ARGUMENT
+				// -------------------------
+				psi.ArgumentList.Add(arg);
+			}
+
+			using var process = Process.Start(psi);
+
+			string output = process.StandardOutput.ReadToEnd();
+			string error = process.StandardError.ReadToEnd();
+
+			process.WaitForExit();
+
+			// -------------------------
+			// STDOUT HANDLING
+			// -------------------------
+			if (stdoutMode == RedirectMode.None) {
+				Console.Write(output);
 			}
 			else {
-				Console.WriteLine($"{command}: command not found");
+				_WriteOutput(output, stdoutMode, stdoutFile);
+			}
+
+			// -------------------------
+			// STDERR HANDLING
+			// -------------------------
+			if (stderrMode == RedirectMode.None) {
+				Console.Error.Write(error);
+			}
+			else {
+				_WriteOutput(error, stderrMode, stderrFile);
 			}
 
 		}
-
-
 	}
 
 	private static string _ReadCommandLine(string[] allCommands, Dictionary<string, string> customCompletions)
@@ -262,7 +276,7 @@ class Program
 
 				List<string> matches;
 				string prefix;
-				string searchDirectory;  
+				string searchDirectory;
 
 				if (customCompletions.TryGetValue(line.Trim(), out var completionDir)) {
 					searchDirectory = completionDir;
