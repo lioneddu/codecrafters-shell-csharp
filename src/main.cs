@@ -33,11 +33,6 @@ class Program
 
 			while (true) {
 
-				foreach (var finishedJob in jobManager.RefreshStatuses()) {
-					//Console.WriteLine($"[{finishedJob.Id}]+  Done                    {finishedJob.CommandLine}");
-					jobManager.RemoveJob(finishedJob.Id);
-				}
-
 				Console.Write("$ ");
 
 				string command = _ReadCommandLine(allCommands, customCompletions);
@@ -184,13 +179,7 @@ class Program
 
 				if (command.Equals("jobs")) {
 					// List all background jobs
-					var jobList = jobManager.GetJobsWithIndicators();
-					
-					if (jobList.Any()) {
-						foreach (var (job, indicator) in jobList) {
-							Console.WriteLine($"[{job.Id}]{indicator}  {job.Status.ToString().PadRight(24)} {job.CommandLine}");
-						}
-					}
+					jobManager.PrintJobs();					
 
 					continue;
 				}
@@ -765,21 +754,37 @@ class BackgroundJobManager
 		return _jobs.FirstOrDefault(j => j.Id == jobId);
 	}
 
-	// Check every still-Running job to see if its process has exited, and flip
-	// its status to Done accordingly. Returns the jobs that transitioned to
-	// Done during this call, so the caller can print a one-time notification.
-	public List<Job> RefreshStatuses()
+	/// <summary>
+	/// Refresh job statuses, print every currently tracked job in bash's
+	/// "jobs" format, then reap (remove) any job that has just finished.
+	/// </summary>
+	public void PrintJobs()
 	{
-		var newlyFinished = new List<Job>();
-
+		// Detect jobs whose process has exited since the last check, without
+		// blocking: WaitForExit() would wait, HasExited only polls the state.
 		foreach (var job in _jobs.Where(j => j.Status == JobStatus.Running)) {
 			if (job.Process.HasExited) {
 				job.Status = JobStatus.Done;
-				newlyFinished.Add(job);
 			}
 		}
 
-		return newlyFinished;
+		var jobList = GetJobsWithIndicators();
+
+		if (jobList.Any()) {
+			foreach (var (job, indicator) in jobList) {
+				Console.WriteLine($"[{job.Id}]{indicator}  {job.Status.ToString().PadRight(24)} {job.CommandLine}");
+			}
+		}
+
+		// Reap: remove jobs that were just reported as Done, so they don't
+		// appear again on the next "jobs" call.
+		var doneIds = _jobs.Where(j => j.Status == JobStatus.Done)
+							.Select(j => j.Id)
+							.ToList();
+
+		foreach (var id in doneIds) {
+			RemoveJob(id);
+		}
 	}
 
 	// Returns the currently tracked jobs paired with their bash-style indicator:
