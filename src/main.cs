@@ -137,7 +137,7 @@ class Program
 								Console.WriteLine(customCompletions[completeArgs[2]]);
 							}
 							else {
-								Console.WriteLine($"complete: {completeArgs[2]}: not completion specification");
+								Console.WriteLine($"complete: {completeArgs[2]}: no completion specification");
 							}
 						}
 					}
