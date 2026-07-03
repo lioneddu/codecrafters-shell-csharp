@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Diagnostics;
 using System.Security;
 using System.Text;
@@ -725,6 +726,10 @@ class Program
 	{
 		var stageTexts = _SplitPipelineStages(command);
 		var processes = new Process[stageTexts.Count];
+		var stdoutModes = new RedirectMode[stageTexts.Count];
+
+		RedirectMode lastStdoutMode = RedirectMode.None;
+		string lastStdoutFile = string.Empty;
 
 		for (int i = 0; i < stageTexts.Count; i++) {
 			var tokens = _ParseArguments(stageTexts[i]);
@@ -744,51 +749,46 @@ class Program
 				out RedirectMode stdoutMode, out string stdoutFile,
 				out RedirectMode stderrMode, out string stderrFile);
 
+			stdoutModes[i] = stdoutMode;
 			bool isFirst = i == 0;
 			bool isLast = i == stageTexts.Count - 1;
 
+			if (isLast) {
+				lastStdoutMode = stdoutMode;
+				lastStdoutFile = stdoutFile;
+			}
+
 			psi.RedirectStandardInput = !isFirst;
-			psi.RedirectStandardOutput = !isLast || stdoutMode != RedirectMode.None;
+			psi.RedirectStandardOutput = true;
 			psi.RedirectStandardError = stderrMode != RedirectMode.None;
 
 			var process = Process.Start(psi);
 			processes[i] = process;
 
-			if (!isLast && stdoutMode == RedirectMode.None) {
-				int nextIndex = i;
-				var sourceStream = process.StandardOutput.BaseStream;
+		}
 
-				Task.Run(() => {
-					try {
-						var destStream = processes[nextIndex + 1].StandardInput.BaseStream;
-						sourceStream.CopyTo(destStream);
-						processes[nextIndex + 1].StandardInput.Close();
-					}
-					catch (IOException) { /* downstream stage exited early */ }
-					catch (ObjectDisposedException) { /* same as above */ }
-				});
-			}
+		for (int i = 0; i < processes.Length - 1; i++) {
+			if (stdoutModes[i] != RedirectMode.None)
+				continue;
 
-			// These blocking reads only make sense for a foreground pipeline;
-			// in the background case we skip them entirely (see below).
-			if (!isBackground) {
-				if (isLast && stdoutMode != RedirectMode.None) {
-					string output = process.StandardOutput.ReadToEnd();
-					process.WaitForExit();
-					_WriteOutput(output, stdoutMode, stdoutFile);
+			int index = i;
+
+			Task.Run(() =>
+			{
+				try {
+					processes[index].StandardOutput.BaseStream.CopyTo(
+						processes[index + 1].StandardInput.BaseStream);
+
+					processes[index + 1].StandardInput.Close();
 				}
-
-				if (stderrMode != RedirectMode.None) {
-					string error = process.StandardError.ReadToEnd();
-					_WriteOutput(error, stderrMode, stderrFile);
+				catch (IOException) {
 				}
-			}
+				catch (ObjectDisposedException) {
+				}
+			});
 		}
 
 		if (isBackground) {
-			// Register the pipeline as a single job, keyed on its last stage —
-			// matching bash, which reports the last process's PID for a
-			// backgrounded pipeline.
 			var lastProcess = processes[^1];
 			int jobId = BackgroundJobManager.AddJob(lastProcess, command);
 
@@ -796,9 +796,20 @@ class Program
 			return;
 		}
 
-		// Foreground: only the last stage is awaited, so an earlier still-running
-		// stage (e.g. "tail -f") does not block the shell.
+		string output = processes[^1].StandardOutput.ReadToEnd();
+		string error = string.Empty;
+
+		if (processes[^1].StartInfo.RedirectStandardError) {
+			error = processes[^1].StandardError.ReadToEnd();
+		}
+
 		processes[^1].WaitForExit();
+
+		_WriteOutput(output, lastStdoutMode, lastStdoutFile);
+
+		if (!string.IsNullOrEmpty(error)) {
+			Console.Error.Write(error);
+		}
 	}
 
 	/// <summary>
