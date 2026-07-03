@@ -356,7 +356,15 @@ class Program
 		}
 
 		Console.WriteLine();
-		Console.WriteLine(string.Join("  ", matches));
+		var displayMatches = matches
+			.Select(m => {
+				if (Directory.Exists(m))
+					return m + "/";
+
+				return m;
+			});
+
+		Console.WriteLine(string.Join("  ", displayMatches));
 
 		Console.Write("$ ");
 		Console.Write(buffer.ToString());
