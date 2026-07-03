@@ -7,6 +7,10 @@ class Program
 	// Path used to restore the terminal to its original settings on exit.
 	private static string _savedTtySettings = string.Empty;
 
+	// Returns the set of builtin commands that can meaningfully appear inside
+	// a pipeline (i.e. ones that produce output rather than only side effects).
+	private static readonly HashSet<string> _pipelineCapableBuiltins = new() { "echo", "type", "pwd", "jobs" };
+
 	static void Main()
 	{
 		_EnableRawTerminalMode();
@@ -14,6 +18,7 @@ class Program
 		try {
 
 			string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete", "jobs" };
+
 			Dictionary<string, string> customCompletions = new();
 
 			var allCommands = new string[builtInCommands.Length];
@@ -54,7 +59,7 @@ class Program
 				}
 
 				if (_ContainsUnquotedPipe(command)) {
-					_ExecutePipeline(command, isBackground);
+					_ExecutePipeline(command, isBackground, builtInCommands);
 					continue;
 				}
 
@@ -714,23 +719,26 @@ class Program
 	}
 
 	/// <summary>
-	/// Executes a pipeline of external commands connected by '|'. Standard output
-	/// of each stage feeds standard input of the next. If isBackground is true,
-	/// the whole pipeline is registered as a single job and the shell returns to
+	/// Executes a pipeline of commands connected by '|', where each stage can be
+	/// either an external process or a shell builtin. Standard output of each
+	/// stage feeds standard input of the next. If isBackground is true, the
+	/// whole pipeline is registered as a single job and the shell returns to
 	/// the prompt immediately without waiting for the last stage.
 	/// </summary>
-	/// <param name="command"></param>
-	/// <param name="isBackground"></param>
-	private static void _ExecutePipeline(string command, bool isBackground)
+	private static void _ExecutePipeline(string command, bool isBackground, string[] builtInCommands)
 	{
 		var stageTexts = _SplitPipelineStages(command);
-		var processes = new Process[stageTexts.Count];
-		var stdoutModes = new RedirectMode[stageTexts.Count];
+		int stageCount = stageTexts.Count;
+
+		var processes = new Process?[stageCount];
+		var stdoutModes = new RedirectMode[stageCount];
+		var isBuiltin = new bool[stageCount];
+		var builtinOutputs = new string[stageCount];
 
 		RedirectMode lastStdoutMode = RedirectMode.None;
 		string lastStdoutFile = string.Empty;
 
-		for (int i = 0; i < stageTexts.Count; i++) {
+		for (int i = 0; i < stageCount; i++) {
 			var tokens = _ParseArguments(stageTexts[i]);
 
 			if (tokens.Count == 0) {
@@ -738,8 +746,25 @@ class Program
 				return;
 			}
 
-			if (string.IsNullOrEmpty(_FindCommandInPath(tokens[0]))) {
-				Console.WriteLine($"{tokens[0]}: command not found");
+			string commandName = tokens[0];
+			bool isFirst = i == 0;
+			bool isLast = i == stageCount - 1;
+
+			if (_pipelineCapableBuiltins.Contains(commandName)) {
+				// Builtins run in-process: no Process object, output computed
+				// eagerly as a string and wired to the next stage below.
+				isBuiltin[i] = true;
+				builtinOutputs[i] = _ExecuteBuiltinForPipeline(stageTexts[i], builtInCommands);
+
+				if (isLast) {
+					lastStdoutMode = RedirectMode.None;
+				}
+
+				continue;
+			}
+
+			if (string.IsNullOrEmpty(_FindCommandInPath(commandName))) {
+				Console.WriteLine($"{commandName}: command not found");
 				return;
 			}
 
@@ -749,81 +774,123 @@ class Program
 				out RedirectMode stderrMode, out string stderrFile);
 
 			stdoutModes[i] = stdoutMode;
-			bool isFirst = i == 0;
-			bool isLast = i == stageTexts.Count - 1;
 
 			if (isLast) {
 				lastStdoutMode = stdoutMode;
 				lastStdoutFile = stdoutFile;
 			}
 
+			// A builtin never reads stdin, so there is no point handing an
+			// external process a pipe to a stage that will just ignore it —
+			// still redirect it, though, since we need to drain and discard it
+			// ourselves rather than let it print straight to the console.
 			psi.RedirectStandardInput = !isFirst;
-
-			// Only redirect this stage's stdout into a .NET pipe when it needs to
-			// feed the next stage. The last stage's stdout goes straight to the
-			// console (or to a file, if explicitly redirected), so its output is
-			// visible immediately instead of being buffered until the pipeline ends.
 			psi.RedirectStandardOutput = !isLast || stdoutMode != RedirectMode.None;
-
 			psi.RedirectStandardError = stderrMode != RedirectMode.None;
 
-			var process = Process.Start(psi);
-			processes[i] = process;
+			processes[i] = Process.Start(psi);
 		}
 
-		// Bridge each non-last stage's stdout into the next stage's stdin,
-		// streaming data as it arrives. These tasks are intentionally NOT awaited
-		// as a group: an earlier stage (e.g. "tail -f") may keep running long
-		// after the pipeline's visible output is complete, and waiting for it
-		// here would hang the shell forever.
-		for (int i = 0; i < processes.Length - 1; i++) {
-			if (stdoutModes[i] != RedirectMode.None)
-				continue;
-
+		// Wire each stage's output to the next stage's input, streaming as data
+		// arrives. Tasks are intentionally not awaited as a group: an earlier
+		// stage (e.g. "tail -f") may keep running after the pipeline's visible
+		// output is complete, and waiting for it here would hang the shell.
+		for (int i = 0; i < stageCount - 1; i++) {
 			int index = i;
+			bool nextIsBuiltin = isBuiltin[index + 1];
+
+			if (isBuiltin[index]) {
+				// Builtin stage feeding the next stage: its output is already a
+				// complete string (builtins are not streaming). If the next
+				// stage is external, write it once to that process's stdin.
+				// If the next stage is also a builtin, there is nothing to feed
+				// it (builtins don't read stdin), so there is nothing to do.
+				if (!nextIsBuiltin) {
+					var nextProcess = processes[index + 1]!;
+
+					Task.Run(() => {
+						try {
+							nextProcess.StandardInput.Write(builtinOutputs[index]);
+							nextProcess.StandardInput.Close();
+						}
+						catch (IOException) { /* downstream stage exited early */ }
+						catch (ObjectDisposedException) { /* same as above */ }
+					});
+				}
+
+				continue;
+			}
+
+			if (stdoutModes[index] != RedirectMode.None)
+				continue; // this stage's stdout was explicitly redirected to a file
+
+			var sourceProcess = processes[index]!;
 
 			Task.Run(() => {
 				try {
-					var source = processes[index].StandardOutput.BaseStream;
-					var dest = processes[index + 1].StandardInput.BaseStream;
-
+					var source = sourceProcess.StandardOutput.BaseStream;
 					byte[] buffer = new byte[4096];
 					int read;
+
+					if (nextIsBuiltin) {
+						// The next stage ignores stdin entirely: drain this
+						// stage's output and discard it, so the producer isn't
+						// blocked writing to a pipe nobody reads (this matches
+						// bash: "ls | type exit" does not print ls's output).
+						while ((read = source.Read(buffer, 0, buffer.Length)) > 0) {
+							// intentionally discarded
+						}
+						return;
+					}
+
+					var dest = processes[index + 1]!.StandardInput.BaseStream;
 
 					while ((read = source.Read(buffer, 0, buffer.Length)) > 0) {
 						dest.Write(buffer, 0, read);
 						dest.Flush();
 					}
 
-					processes[index + 1].StandardInput.Close();
+					processes[index + 1]!.StandardInput.Close();
 				}
 				catch (IOException) { /* downstream stage exited early */ }
 				catch (ObjectDisposedException) { /* same as above */ }
 			});
 		}
 
-		if (isBackground) {
-			var lastProcess = processes[^1];
-			int jobId = BackgroundJobManager.AddJob(lastProcess, command);
+		bool lastIsBuiltin = isBuiltin[stageCount - 1];
 
-			Console.WriteLine($"[{jobId}] {lastProcess.Id}");
+		if (isBackground) {
+			// A background pipeline is tracked via its last external stage, if
+			// any. A pipeline whose last stage is a builtin has no process to
+			// track (builtins are synchronous and already finished by now).
+			if (!lastIsBuiltin) {
+				var lastProcess = processes[stageCount - 1]!;
+				int jobId = BackgroundJobManager.AddJob(lastProcess, command);
+				Console.WriteLine($"[{jobId}] {lastProcess.Id}");
+			}
+
 			return;
 		}
 
-		// Only the last stage is awaited: earlier stages may legitimately keep
-		// running (e.g. "tail -f") after the pipeline's visible output is done.
-		processes[^1].WaitForExit();
+		if (lastIsBuiltin) {
+			// The last stage is a builtin: its output was computed eagerly and
+			// simply needs to be printed now that the pipeline has run.
+			Console.Write(builtinOutputs[stageCount - 1]);
+			return;
+		}
 
-		// If the last stage's stdout was explicitly redirected to a file, it was
-		// captured into our own pipe rather than sent to the console, so we still
-		// need to read and write it out now that the process has exited.
+		// Last stage is external: only it is awaited, so an earlier still-running
+		// stage (e.g. "tail -f") does not block the shell.
+		var finalProcess = processes[stageCount - 1]!;
+		finalProcess.WaitForExit();
+
 		if (lastStdoutMode != RedirectMode.None) {
-			string output = processes[^1].StandardOutput.ReadToEnd();
+			string output = finalProcess.StandardOutput.ReadToEnd();
 			_WriteOutput(output, lastStdoutMode, lastStdoutFile);
 		}
 
-		if (processes[^1].StartInfo.RedirectStandardError) {
-			string error = processes[^1].StandardError.ReadToEnd();
+		if (finalProcess.StartInfo.RedirectStandardError) {
+			string error = finalProcess.StandardError.ReadToEnd();
 			Console.Error.Write(error);
 		}
 	}
@@ -873,6 +940,111 @@ class Program
 		}
 
 		return psi;
+	}
+
+	/// <summary>
+	/// Builds the output of the "echo" builtin as a string, without printing it
+	/// or handling its own redirection — used when echo is a pipeline stage,
+	/// where the produced text is routed to the next stage (or the console)
+	/// by the pipeline logic itself..
+	/// </summary>
+	/// <param name="echoArguments"></param>
+	/// <returns></returns>
+	private static string _GetEchoOutput(string echoArguments)
+	{
+		var echoTokens = _ParseArguments(echoArguments);
+		var echoArgs = new List<string>();
+
+		// Redirection operators are stripped even inside a pipeline stage, but
+		// where they point to is ignored here: the pipeline decides where this
+		// stage's output goes.
+		for (int i = 0; i < echoTokens.Count; i++) {
+			string arg = echoTokens[i];
+
+			if (arg == ">" || arg == "1>" || arg == ">>" || arg == "1>>" ||
+				arg == "2>" || arg == "2>>") {
+				i++; // skip the filename that follows
+				continue;
+			}
+
+			echoArgs.Add(arg);
+		}
+
+		return string.Join(" ", echoArgs) + "\n";
+	}
+
+	/// <summary>
+	/// Builds the output of the "type" builtin as a string.
+	/// </summary>
+	/// <param name="specifiedCommand"></param>
+	/// <param name="builtInCommands"></param>
+	/// <returns></returns>
+	private static string _GetTypeOutput(string specifiedCommand, string[] builtInCommands)
+	{
+		if (builtInCommands.Contains(specifiedCommand))
+			return $"{specifiedCommand} is a shell builtin\n";
+
+		string path = _FindCommandInPath(specifiedCommand);
+
+		return string.IsNullOrEmpty(path)
+			? $"{specifiedCommand}: not found\n"
+			: $"{specifiedCommand} is {path}\n";
+	}
+
+	/// <summary>
+	/// Runs an Action while temporarily capturing anything it writes to
+	/// Console.Out, returning the captured text instead of printing it.
+	/// Used to reuse existing builtins (like BackgroundJobManager.PrintJobs)
+	/// inside a pipeline without rewriting them to return strings directly.
+	/// </summary>
+	/// <param name="action"></param>
+	/// <returns></returns>
+	private static string _CaptureConsoleOutput(Action action)
+	{
+		var originalOut = Console.Out;
+		var stringWriter = new StringWriter();
+
+		try {
+			Console.SetOut(stringWriter);
+			action();
+		}
+		finally {
+			Console.SetOut(originalOut);
+		}
+
+		return stringWriter.ToString();
+	}
+
+	/// <summary>
+	/// Executes a single builtin as one stage of a pipeline and returns
+	/// everything it would have printed to stdout, as a string.
+	/// </summary>
+	/// <param name="stageText"></param>
+	/// <param name="builtInCommands"></param>
+	/// <returns></returns>
+	private static string _ExecuteBuiltinForPipeline(string stageText, string[] builtInCommands)
+	{
+		var tokens = _ParseArguments(stageText);
+		string commandName = tokens[0];
+
+		switch (commandName) {
+			case "echo":
+				string echoArguments = stageText.Length > 4 ? stageText.Substring(5) : string.Empty;
+				return _GetEchoOutput(echoArguments);
+
+			case "type":
+				string specifiedCommand = tokens.Count > 1 ? tokens[1] : string.Empty;
+				return _GetTypeOutput(specifiedCommand, builtInCommands);
+
+			case "pwd":
+				return Directory.GetCurrentDirectory() + "\n";
+
+			case "jobs":
+				return _CaptureConsoleOutput(() => BackgroundJobManager.PrintJobs());
+
+			default:
+				return string.Empty;
+		}
 	}
 }
 
