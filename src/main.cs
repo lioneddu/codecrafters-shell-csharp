@@ -286,11 +286,9 @@ class Program
 					}
 
 					matches = Directory
-						.GetFileSystemEntries(searchDirectory)
-						.Select(Path.GetFileName)
-						.Where(f => f.StartsWith(filePrefix))
-						.OrderBy(f => f)
-						.Select(f => pathPrefix + f)
+						.EnumerateFileSystemEntries(searchDirectory)
+						.Where(e => Path.GetFileName(e).StartsWith(filePrefix))
+						.OrderBy(Path.GetFileName)
 						.ToList();
 
 					prefix = token;
@@ -319,10 +317,10 @@ class Program
 		}
 
 		if (matches.Count == 1) {
-			string completion = matches[0];
-			string missing = completion.Substring(prefix.Length);
-
-			string fullPath = Path.Combine(searchDirectory, completion);
+			string fullPath = matches[0];
+			bool isDirectory = Directory.Exists(fullPath);
+			string completion = prefix + Path.GetFileName(fullPath);
+			string missing = fullPath.Substring(prefix.Length);
 
 			buffer.Append(missing);
 			Console.Write(missing);
