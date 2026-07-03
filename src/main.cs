@@ -186,7 +186,7 @@ class Program
 						}
 					}
 					else {
-						Console.WriteLine("$ ");
+						Console.Write("$ ");
 
 					}
 
