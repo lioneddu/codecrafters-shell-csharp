@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Diagnostics;
 using System.Security;
 using System.Text;
@@ -203,7 +202,7 @@ class Program
 				// real command management
 				var tokens = _ParseArguments(command);
 				string commandName = tokens[0];
-
+				Console.WriteLine($"Executing command: {commandName}");
 				if (string.IsNullOrEmpty(_FindCommandInPath(commandName))) {
 					Console.WriteLine($"{command}: command not found");
 					continue;
@@ -759,28 +758,36 @@ class Program
 			}
 
 			psi.RedirectStandardInput = !isFirst;
-			psi.RedirectStandardOutput = true;
+
+			// Only redirect this stage's stdout into a .NET pipe when it needs to
+			// feed the next stage. The last stage's stdout goes straight to the
+			// console (or to a file, if explicitly redirected), so its output is
+			// visible immediately instead of being buffered until the pipeline ends.
+			psi.RedirectStandardOutput = !isLast || stdoutMode != RedirectMode.None;
+
 			psi.RedirectStandardError = stderrMode != RedirectMode.None;
 
 			var process = Process.Start(psi);
 			processes[i] = process;
-
 		}
 
+		// Bridge each non-last stage's stdout into the next stage's stdin,
+		// streaming data as it arrives. These tasks are intentionally NOT awaited
+		// as a group: an earlier stage (e.g. "tail -f") may keep running long
+		// after the pipeline's visible output is complete, and waiting for it
+		// here would hang the shell forever.
 		for (int i = 0; i < processes.Length - 1; i++) {
 			if (stdoutModes[i] != RedirectMode.None)
 				continue;
 
 			int index = i;
 
-			Task.Run(() =>
-			{
+			Task.Run(() => {
 				try {
 					var source = processes[index].StandardOutput.BaseStream;
 					var dest = processes[index + 1].StandardInput.BaseStream;
 
 					byte[] buffer = new byte[4096];
-
 					int read;
 
 					while ((read = source.Read(buffer, 0, buffer.Length)) > 0) {
@@ -790,10 +797,8 @@ class Program
 
 					processes[index + 1].StandardInput.Close();
 				}
-				catch (IOException) {
-				}
-				catch (ObjectDisposedException) {
-				}
+				catch (IOException) { /* downstream stage exited early */ }
+				catch (ObjectDisposedException) { /* same as above */ }
 			});
 		}
 
@@ -805,18 +810,20 @@ class Program
 			return;
 		}
 
-		string output = processes[^1].StandardOutput.ReadToEnd();
-		string error = string.Empty;
-
-		if (processes[^1].StartInfo.RedirectStandardError) {
-			error = processes[^1].StandardError.ReadToEnd();
-		}
-
+		// Only the last stage is awaited: earlier stages may legitimately keep
+		// running (e.g. "tail -f") after the pipeline's visible output is done.
 		processes[^1].WaitForExit();
 
-		_WriteOutput(output, lastStdoutMode, lastStdoutFile);
+		// If the last stage's stdout was explicitly redirected to a file, it was
+		// captured into our own pipe rather than sent to the console, so we still
+		// need to read and write it out now that the process has exited.
+		if (lastStdoutMode != RedirectMode.None) {
+			string output = processes[^1].StandardOutput.ReadToEnd();
+			_WriteOutput(output, lastStdoutMode, lastStdoutFile);
+		}
 
-		if (!string.IsNullOrEmpty(error)) {
+		if (processes[^1].StartInfo.RedirectStandardError) {
+			string error = processes[^1].StandardError.ReadToEnd();
 			Console.Error.Write(error);
 		}
 	}
