@@ -360,6 +360,10 @@ class Program
 						psi.ArgumentList.Add(wordBeingCompleted);
 						psi.ArgumentList.Add(previousWord);
 
+						//Save env variables
+						Environment.SetEnvironmentVariable("COMP_LINE", line);
+						Environment.SetEnvironmentVariable("COMP_POINT", line.Length.ToString());
+
 						using var process = Process.Start(psi);
 
 						string completion = process.StandardOutput.ReadToEnd()
