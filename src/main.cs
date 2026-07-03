@@ -776,8 +776,17 @@ class Program
 			Task.Run(() =>
 			{
 				try {
-					processes[index].StandardOutput.BaseStream.CopyTo(
-						processes[index + 1].StandardInput.BaseStream);
+					var source = processes[index].StandardOutput.BaseStream;
+					var dest = processes[index + 1].StandardInput.BaseStream;
+
+					byte[] buffer = new byte[4096];
+
+					int read;
+
+					while ((read = source.Read(buffer, 0, buffer.Length)) > 0) {
+						dest.Write(buffer, 0, read);
+						dest.Flush();
+					}
 
 					processes[index + 1].StandardInput.Close();
 				}
