@@ -175,42 +175,34 @@ class Program
 				RedirectMode stderrMode = RedirectMode.None;
 
 
-				foreach (var arg in tokens.Skip(1)) {
+				for (int i = 0; i < tokens.Count; i++) {
+					var arg = tokens[i];
 
-					if (arg == ">" || arg == "1>") {
+					if (arg == "1>" || arg == ">") {
 						stdoutMode = RedirectMode.Overwrite;
+						outputFilename = tokens[++i];
 						continue;
 					}
 
-					if (arg == ">>" || arg == "1>>") {
+					if (arg == "1>>" || arg == ">>") {
 						stdoutMode = RedirectMode.Append;
+						outputFilename = tokens[++i];
 						continue;
 					}
-
 
 					if (arg == "2>") {
 						stderrMode = RedirectMode.Overwrite;
+						errorFilename = tokens[++i];
 						continue;
 					}
 
 					if (arg == "2>>") {
 						stderrMode = RedirectMode.Append;
+						errorFilename = tokens[++i];
 						continue;
 					}
-
-					if (stdoutMode != RedirectMode.None && arg != ">" && arg != "1>") {
-						outputFilename = arg;
-						continue;
-					}
-
-					if (stderrMode != RedirectMode.None && arg != "2>") {
-						errorFilename = arg;
-						continue;
-					}
-
 
 					psi.ArgumentList.Add(arg);
-
 				}
 
 				psi.RedirectStandardOutput = true;
@@ -222,15 +214,14 @@ class Program
 				string output = process.StandardOutput.ReadToEnd();
 				string error = process.StandardError.ReadToEnd();
 				process.WaitForExit();
-				Console.Error.WriteLine($"stderrMode={stderrMode}, errorFile={errorFilename}");
+
 				_WriteOutput(output, stdoutMode, outputFilename);
 
-
-				if (stderrMode != RedirectMode.None && !string.IsNullOrEmpty(errorFilename)) {
-					_WriteOutput(error, stderrMode, errorFilename);
+				if (stderrMode == RedirectMode.None) {
+					Console.Error.Write(error);
 				}
 				else {
-					Console.Error.Write(error);
+					_WriteOutput(error, stderrMode, errorFilename);
 				}
 			}
 			else {
