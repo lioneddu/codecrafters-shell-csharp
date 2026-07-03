@@ -366,20 +366,27 @@ class Program
 
 						using var process = Process.Start(psi);
 
-						string completion = process.StandardOutput.ReadToEnd()
-							.TrimEnd('\r', '\n');
+						string rawOutput = process.StandardOutput.ReadToEnd();
 
 						process.WaitForExit();
 
+						// The completer prints one candidate per line; split on both \n and \r\n
+						// and drop empty entries (e.g. a trailing blank line).
+						string[] candidates = rawOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+							.Select(c => c.TrimEnd('\r'))
+							.Where(c => !string.IsNullOrEmpty(c))
+							.ToArray();
+
 						// If the completer printed nothing, there are no candidates:
 						// ring the bell and leave the input line untouched.
-						if (string.IsNullOrEmpty(completion)) {
+						if (candidates.Length == 0) {
 							Console.Write("\x07");
 							previousWasTab = false;
 							continue;
 						}
 
-						matches = new List<string> { completion };
+						// Candidates must be sorted alphabetically before being handed to Complete().
+						matches = candidates.OrderBy(c => c, StringComparer.Ordinal).ToList();
 						prefix = wordBeingCompleted;
 
 						Complete(matches, prefix, ".", buffer, ref previousWasTab);
