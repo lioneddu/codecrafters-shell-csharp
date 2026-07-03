@@ -298,13 +298,20 @@ class Program
 
 						process.WaitForExit();
 
+						// If the completer printed nothing, there are no candidates:
+						// ring the bell and leave the input line untouched.
+						if (string.IsNullOrEmpty(completion)) {
+							Console.Write("\x07");
+							previousWasTab = false;
+							continue;
+						}
+
 						matches = new List<string> { completion };
 						prefix = line[(lastSpace + 1)..];
 
 						Complete(matches, prefix, ".", buffer, ref previousWasTab);
 						continue;
 					}
-
 
 					// Filename completion
 					string token = line[(lastSpace + 1)..];
