@@ -7,6 +7,7 @@ class Program
 	static void Main()
 	{
 		string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete" };
+		Dictionary<string, string> customCompletions = new();
 
 		var allCommands = new string[builtInCommands.Length];
 		builtInCommands.CopyTo(allCommands, 0);
@@ -25,7 +26,7 @@ class Program
 		while (true) {
 			Console.Write("$ ");
 
-			string command = _ReadCommandLine(allCommands);
+			string command = _ReadCommandLine(allCommands, customCompletions);
 			//string command = Console.ReadLine();
 
 			if (command.StartsWith("echo")) {
@@ -127,6 +128,29 @@ class Program
 				continue;
 			}
 
+			if (command.StartsWith("complete")) {
+				string[] completeArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+				if (completeArgs.Length > 1) {
+					if (completeArgs[1] == "-p") {
+						if (completeArgs.Length > 2) {
+							if (customCompletions.ContainsKey(completeArgs[2])) {
+								Console.WriteLine(customCompletions[completeArgs[2]]);
+							}
+							else {
+								Console.WriteLine($"complete: {completeArgs[2]}: not completion specification");
+							}
+						}
+					}
+
+					if (completeArgs[1].ToLower() == "-c") {
+						if (completeArgs.Length > 2) {
+							customCompletions[completeArgs[2]] = completeArgs[3];
+						}
+					}
+				}
+				continue;
+			}
+
 
 			if (command.Equals("exit")) {
 				break;
@@ -216,7 +240,7 @@ class Program
 
 	}
 
-	private static string _ReadCommandLine(string[] allCommands)
+	private static string _ReadCommandLine(string[] allCommands, Dictionary<string, string> customCompletions)
 	{
 		var buffer = new StringBuilder();
 		bool previousWasTab = false;
@@ -245,7 +269,14 @@ class Program
 
 				List<string> matches;
 				string prefix;
-				string searchDirectory = ".";   // default
+				string searchDirectory;  
+
+				if (customCompletions.TryGetValue(line.Trim(), out var completionDir)) {
+					searchDirectory = completionDir;
+				}
+				else {
+					searchDirectory = ".";  // default
+				}
 
 				if (lastSpace == -1) {
 					// Command completion
