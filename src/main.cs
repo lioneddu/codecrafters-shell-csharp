@@ -222,7 +222,7 @@ class Program
 				string output = process.StandardOutput.ReadToEnd();
 				string error = process.StandardError.ReadToEnd();
 				process.WaitForExit();
-
+				Console.Error.WriteLine($"stderrMode={stderrMode}, errorFile={errorFilename}");
 				_WriteOutput(output, stdoutMode, outputFilename);
 
 
@@ -272,13 +272,6 @@ class Program
 				List<string> matches;
 				string prefix;
 				string searchDirectory;  
-
-				if (customCompletions.TryGetValue(line.Trim(), out var completionDir)) {
-					searchDirectory = completionDir;
-				}
-				else {
-					searchDirectory = ".";  // default
-				}
 
 				if (lastSpace == -1) {
 					// Command completion
