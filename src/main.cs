@@ -273,6 +273,13 @@ class Program
 				string prefix;
 				string searchDirectory;  
 
+				if (customCompletions.TryGetValue(line.Trim(), out var completionDir)) {
+					searchDirectory = completionDir;
+				}
+				else {
+					searchDirectory = ".";  // default
+				}
+
 				if (lastSpace == -1) {
 					// Command completion
 					prefix = line;
