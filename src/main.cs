@@ -262,7 +262,7 @@ class Program
 
 				List<string> matches;
 				string prefix;
-				string searchDirectory;  
+				string searchDirectory;
 
 				if (customCompletions.TryGetValue(line.Trim(), out var completionDir)) {
 					searchDirectory = completionDir;
@@ -281,15 +281,38 @@ class Program
 						.ToList();
 				}
 				else {
-					//custom completion
-					string commandName = line[..lastSpace];
+
+					// Custom completion.
+					// The command name is always the first word on the line, regardless of
+					// how many words have been typed after it.
+					var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+					string commandName = words.Length > 0 ? words[0] : string.Empty;
 
 					if (customCompletions.TryGetValue(commandName, out var script)) {
+						// The word currently being completed is whatever follows the last space.
+						// It is empty when the line ends with a space (i.e. starting a new word).
+						string wordBeingCompleted = line[(lastSpace + 1)..];
+
+						// The previous word is the word immediately before the one being completed.
+						// If there isn't one, pass an empty string.
+						string previousWord = string.Empty;
+						bool endsWithSpace = line.Length > 0 && line[^1] == ' ';
+						int previousWordIndex = endsWithSpace ? words.Length - 1 : words.Length - 2;
+
+						if (previousWordIndex >= 0 && previousWordIndex < words.Length) {
+							previousWord = words[previousWordIndex];
+						}
+
 						var psi = new ProcessStartInfo {
 							FileName = script,
 							RedirectStandardOutput = true,
 							UseShellExecute = false
 						};
+
+						// Pass argv[1] = command, argv[2] = word being completed, argv[3] = previous word.
+						psi.ArgumentList.Add(commandName);
+						psi.ArgumentList.Add(wordBeingCompleted);
+						psi.ArgumentList.Add(previousWord);
 
 						using var process = Process.Start(psi);
 
@@ -307,7 +330,7 @@ class Program
 						}
 
 						matches = new List<string> { completion };
-						prefix = line[(lastSpace + 1)..];
+						prefix = wordBeingCompleted;
 
 						Complete(matches, prefix, ".", buffer, ref previousWasTab);
 						continue;
