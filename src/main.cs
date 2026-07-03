@@ -32,6 +32,12 @@ class Program
 			}
 
 			while (true) {
+
+				foreach (var finishedJob in jobManager.RefreshStatuses()) {
+					//Console.WriteLine($"[{finishedJob.Id}]+  Done                    {finishedJob.CommandLine}");
+					jobManager.RemoveJob(finishedJob.Id);
+				}
+
 				Console.Write("$ ");
 
 				string command = _ReadCommandLine(allCommands, customCompletions);
@@ -178,11 +184,11 @@ class Program
 
 				if (command.Equals("jobs")) {
 					// List all background jobs
-					var jobList = jobManager.GetJobs();
+					var jobList = jobManager.GetJobsWithIndicators();
 					
 					if (jobList.Any()) {
-						foreach (var job in jobList) {
-							Console.WriteLine($"[{job.Id}] {job.Process}");
+						foreach (var (job, indicator) in jobList) {
+							Console.WriteLine($"[{job.Id}]{indicator}  {job.Status.ToString().PadRight(24)} {job.CommandLine}");
 						}
 					}
 
@@ -704,12 +710,20 @@ class Program
 	}
 }
 
+// Possible states of a tracked job.
+enum JobStatus
+{
+	Running,
+	Done
+}
+
 // Represents a single background process tracked by the shell.
 class Job
 {
 	public int Id { get; }
 	public Process Process { get; }
 	public string CommandLine { get; }
+	public JobStatus Status { get; set; } = JobStatus.Running;
 
 	public Job(int id, Process process, string commandLine)
 	{
@@ -749,5 +763,48 @@ class BackgroundJobManager
 	public Job? GetJob(int jobId)
 	{
 		return _jobs.FirstOrDefault(j => j.Id == jobId);
+	}
+
+	// Check every still-Running job to see if its process has exited, and flip
+	// its status to Done accordingly. Returns the jobs that transitioned to
+	// Done during this call, so the caller can print a one-time notification.
+	public List<Job> RefreshStatuses()
+	{
+		var newlyFinished = new List<Job>();
+
+		foreach (var job in _jobs.Where(j => j.Status == JobStatus.Running)) {
+			if (job.Process.HasExited) {
+				job.Status = JobStatus.Done;
+				newlyFinished.Add(job);
+			}
+		}
+
+		return newlyFinished;
+	}
+
+	// Returns the currently tracked jobs paired with their bash-style indicator:
+	// '+' for the most recently started job (the "current" job),
+	// '-' for the second most recently started job (the "previous" job),
+	// ' ' for all others. Order follows job number, matching bash's "jobs" output.
+	public List<(Job Job, char Indicator)> GetJobsWithIndicators()
+	{
+		var ordered = GetJobs(); // already sorted by Id ascending
+
+		var result = new List<(Job, char)>();
+
+		for (int i = 0; i < ordered.Count; i++) {
+			char indicator = ' ';
+
+			if (i == ordered.Count - 1) {
+				indicator = '+';
+			}
+			else if (i == ordered.Count - 2) {
+				indicator = '-';
+			}
+
+			result.Add((ordered[i], indicator));
+		}
+
+		return result;
 	}
 }
