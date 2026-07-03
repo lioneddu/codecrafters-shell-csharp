@@ -6,7 +6,7 @@ class Program
 {
 	static void Main()
 	{
-		string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd" };
+		string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete" };
 
 		var allCommands = new string[builtInCommands.Length];
 		builtInCommands.CopyTo(allCommands, 0);
