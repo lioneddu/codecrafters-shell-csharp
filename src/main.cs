@@ -32,7 +32,13 @@ class Program
 			}
 
 			while (true) {
-
+				// Report any background job that finished since the last prompt,
+				// matching bash's "[n]+  Done   command" notification, then drop it
+				// from tracking since it has already been reported.
+				foreach (var finishedJob in jobManager.RefreshStatuses()) {
+					Console.WriteLine($"[{finishedJob.Id}]+  Done                    {finishedJob.CommandLine}");
+					jobManager.RemoveJob(finishedJob.Id);
+				}
 				Console.Write("$ ");
 
 				string command = _ReadCommandLine(allCommands, customCompletions);
@@ -811,5 +817,22 @@ class BackgroundJobManager
 		}
 
 		return result;
+	}
+
+	// Check every still-Running job to see if its process has exited, and flip
+	// its status to Done accordingly. Returns the jobs that transitioned to
+	// Done during this call, so the caller can print a one-time notification.
+	public List<Job> RefreshStatuses()
+	{
+		var newlyFinished = new List<Job>();
+
+		foreach (var job in _jobs.Where(j => j.Status == JobStatus.Running)) {
+			if (job.Process.HasExited) {
+				job.Status = JobStatus.Done;
+				newlyFinished.Add(job);
+			}
+		}
+
+		return newlyFinished;
 	}
 }
