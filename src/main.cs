@@ -6,7 +6,7 @@ class Program
 {
 	static void Main()
 	{
-		string[] builtInCommands =	{"echo","exit",	"type",	"pwd",	"cd"};
+		string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd" };
 
 		var allCommands = new string[builtInCommands.Length];
 		builtInCommands.CopyTo(allCommands, 0);
@@ -245,11 +245,11 @@ class Program
 
 				List<string> matches;
 				string prefix;
+				string searchDirectory = ".";   // default
 
 				if (lastSpace == -1) {
 					// Command completion
 					prefix = line;
-
 
 					matches = allCommands
 						.Where(c => c.StartsWith(prefix))
@@ -258,26 +258,25 @@ class Program
 				}
 				else {
 					// Filename completion
-					prefix = line[(lastSpace + 1)..];
+					string token = line[(lastSpace + 1)..];
 
-					string searchDirectory;
 					string filePrefix;
 					string pathPrefix;
 
-					if (prefix.Contains('/')) {
-						int lastSlash = prefix.LastIndexOf('/');
+					if (token.Contains('/')) {
+						int lastSlash = token.LastIndexOf('/');
 
-						pathPrefix = prefix[..(lastSlash + 1)];
-						filePrefix = prefix[(lastSlash + 1)..];
+						pathPrefix = token[..(lastSlash + 1)];
+						filePrefix = token[(lastSlash + 1)..];
 
 						searchDirectory = string.IsNullOrEmpty(pathPrefix)
 							? "."
 							: pathPrefix;
 					}
 					else {
-						searchDirectory = ".";
 						pathPrefix = "";
-						filePrefix = prefix;
+						filePrefix = token;
+						searchDirectory = ".";
 					}
 
 					if (!Directory.Exists(searchDirectory)) {
@@ -293,9 +292,11 @@ class Program
 						.OrderBy(f => f)
 						.Select(f => pathPrefix + f)
 						.ToList();
+
+					prefix = token;
 				}
 
-				Complete(matches, prefix, buffer, ref previousWasTab);
+				Complete(matches, prefix, searchDirectory, buffer, ref previousWasTab);
 				continue;
 			}
 
@@ -305,11 +306,11 @@ class Program
 		}
 	}
 
-	private static void Complete(
-	List<string> matches,
-	string prefix,
-	StringBuilder buffer,
-	ref bool previousWasTab)
+	private static void Complete(List<string> matches,
+									string prefix,
+									string searchDirectory,
+									StringBuilder buffer,
+									ref bool previousWasTab)
 	{
 		if (matches.Count == 0) {
 			Console.Write("\x07");
@@ -321,10 +322,19 @@ class Program
 			string completion = matches[0];
 			string missing = completion.Substring(prefix.Length);
 
-			buffer.Append(missing);
-			buffer.Append(' ');
+			string fullPath = Path.Combine(searchDirectory, completion);
 
-			Console.Write(missing + " ");
+			buffer.Append(missing);
+			Console.Write(missing);
+
+			if (Directory.Exists(fullPath)) {
+				buffer.Append('/');
+				Console.Write('/');
+			}
+			else {
+				buffer.Append(' ');
+				Console.Write(' ');
+			}
 
 			previousWasTab = false;
 			return;
