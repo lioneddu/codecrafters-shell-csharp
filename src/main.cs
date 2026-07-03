@@ -129,7 +129,7 @@ class Program
 			}
 
 			if (command.StartsWith("complete")) {
-				string[] completeArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+				string[] completeArgs = command.Split(' ', StringSplitOptions.TrimEntries);
 				if (completeArgs.Length > 1) {
 					if (completeArgs[1] == "-p") {
 						if (completeArgs.Length > 2) {
@@ -144,7 +144,7 @@ class Program
 
 					if (completeArgs[1].ToLower() == "-c") {
 						if (completeArgs.Length > 2) {
-							customCompletions[completeArgs[2]] = completeArgs[3];
+							customCompletions[completeArgs[2]] = $"'{completeArgs[3]}'";
 						}
 					}
 				}
