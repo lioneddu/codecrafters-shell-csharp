@@ -289,6 +289,7 @@ class Program
 						.EnumerateFileSystemEntries(searchDirectory)
 						.Where(e => Path.GetFileName(e).StartsWith(filePrefix))
 						.OrderBy(Path.GetFileName)
+						.Select(e => pathPrefix + Path.GetFileName(e))
 						.ToList();
 
 					prefix = token;
@@ -317,15 +318,13 @@ class Program
 		}
 
 		if (matches.Count == 1) {
-			string fullPath = matches[0];
-			bool isDirectory = Directory.Exists(fullPath);
-			string completion = prefix + Path.GetFileName(fullPath);
-			string missing = fullPath.Substring(prefix.Length);
+			string completion = matches[0];
+			string missing = completion.Substring(prefix.Length);
 
 			buffer.Append(missing);
 			Console.Write(missing);
 
-			if (Directory.Exists(fullPath)) {
+			if (Directory.Exists(completion)) {
 				buffer.Append('/');
 				Console.Write('/');
 			}
