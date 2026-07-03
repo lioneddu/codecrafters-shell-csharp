@@ -129,7 +129,7 @@ class Program
 			}
 
 			if (command.StartsWith("complete")) {
-				string[] completeArgs = command.Split(' ', StringSplitOptions.TrimEntries);
+				string[] completeArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 				if (completeArgs.Length > 1) {
 					if (completeArgs[1] == "-p") {
 						if (completeArgs.Length > 2) {
