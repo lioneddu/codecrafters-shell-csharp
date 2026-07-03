@@ -185,10 +185,6 @@ class Program
 							Console.WriteLine($"[{job.Id}] {job.Process}");
 						}
 					}
-					else {
-						Console.Write("$ ");
-
-					}
 
 					continue;
 				}
