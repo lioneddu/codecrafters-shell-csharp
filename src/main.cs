@@ -159,7 +159,7 @@ class Program
 
 						if (completeArgs[1].ToLower() == "-r") {
 							if (completeArgs.Length > 2) {
-								customCompletions.Remove(completeArgs[3]);
+								customCompletions.Remove(completeArgs[2]);
 							}
 						}
 					}
