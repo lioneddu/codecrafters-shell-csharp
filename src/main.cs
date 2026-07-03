@@ -133,18 +133,20 @@ class Program
 				if (completeArgs.Length > 1) {
 					if (completeArgs[1] == "-p") {
 						if (completeArgs.Length > 2) {
-							if (customCompletions.ContainsKey(completeArgs[2])) {
-								Console.WriteLine(customCompletions[completeArgs[2]]);
+							string cmd = completeArgs[2];
+
+							if (customCompletions.TryGetValue(cmd, out var script)) {
+								Console.WriteLine($"complete -C '{script}' {cmd}");
 							}
 							else {
-								Console.WriteLine($"complete: {completeArgs[2]}: no completion specification");
+								Console.WriteLine($"complete: {cmd}: no completion specification");
 							}
 						}
 					}
 
 					if (completeArgs[1].ToLower() == "-c") {
 						if (completeArgs.Length > 2) {
-							customCompletions[completeArgs[2]] = $"'{completeArgs[3]}'";
+							customCompletions[completeArgs[3]] = $"{completeArgs[2]}";
 						}
 					}
 				}
