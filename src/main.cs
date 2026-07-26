@@ -18,8 +18,9 @@ class Program
 		try {
 
 			string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete", "jobs", "history" };
+            List<string> historyList = new List<string>();
 
-			Dictionary<string, string> customCompletions = new();
+            Dictionary<string, string> customCompletions = new();
 
 			var allCommands = new string[builtInCommands.Length];
 			builtInCommands.CopyTo(allCommands, 0);
@@ -47,6 +48,8 @@ class Program
 				Console.Write("$ ");
 
 				string command = _ReadCommandLine(allCommands, customCompletions);
+
+				historyList.Add(command);
 
 				// Detect a trailing '&' marking this command to run in the background.
 				// The shell must not wait for it to finish before showing the next prompt.
@@ -199,7 +202,17 @@ class Program
 					continue;
 				}
 
-				if (command.Equals("exit")) {
+				if(command.Equals("history"))
+                {
+                    // List all commands in history
+                    for (int i = 0; i < historyList.Count; i++)
+                    {
+                        Console.WriteLine($"{i + 1} {historyList[i]}");
+                    }
+                    continue;
+                }
+
+                if (command.Equals("exit")) {
 					break;
 
 				}
