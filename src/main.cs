@@ -17,7 +17,7 @@ class Program
 
 		try {
 
-			string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete", "jobs" };
+			string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete", "jobs", "history" };
 
 			Dictionary<string, string> customCompletions = new();
 
