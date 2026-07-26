@@ -307,6 +307,10 @@ class Program
 
                 if (command.Equals("exit"))
                 {
+                    if (!string.IsNullOrEmpty(_HistoryPath))
+                    {
+                        File.WriteAllLines(_HistoryPath, _HistoryList);
+                    }
                     break;
 
                 }
