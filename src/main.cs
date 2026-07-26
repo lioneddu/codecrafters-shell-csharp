@@ -880,6 +880,7 @@ class Program
         bool inSingleQuotes = false;
         bool inDoubleQuotes = false;
         bool isVariable = false;
+        bool isBraced = false; // true when the current variable was opened as ${...}
 
         // Resolves the variable name collected so far (if any) and appends its
         // value to the word currently being built. Called whenever a character
@@ -897,6 +898,7 @@ class Program
             }
 
             isVariable = false;
+            isBraced = false;
             variableName.Clear();
         }
 
@@ -904,32 +906,55 @@ class Program
         {
             char c = input[i];
 
-            if (!inSingleQuotes &&
-                !inDoubleQuotes &&
-                c == '$')
+            if (!inSingleQuotes && !inDoubleQuotes && c == '$')
             {
                 FlushVariable(); // in case a previous variable ended right at this '$'
+
+                // Detect the ${VAR} form: consume the '{' now so it never reaches
+                // the general character handling below, and remember that this
+                // variable name must be terminated by '}' rather than by the
+                // first non-identifier character.
+                if (i + 1 < input.Length && input[i + 1] == '{')
+                {
+                    isBraced = true;
+                    i++; // skip the '{'
+                }
+
                 isVariable = true;
                 continue;
             }
 
             if (isVariable)
             {
+                if (isBraced)
+                {
+                    if (c == '}')
+                    {
+                        // Explicit end of the braced variable name.
+                        FlushVariable();
+                        continue;
+                    }
+
+                    // Inside ${...} bash allows the name characters only; anything
+                    // else here would be a syntax error in real bash, but for our
+                    // purposes we just keep collecting until the closing brace.
+                    variableName.Append(c);
+                    continue;
+                }
+
                 if (char.IsLetterOrDigit(c) || c == '_')
                 {
                     variableName.Append(c);
                     continue;
                 }
 
-                // Any other character ends the variable name: resolve it now,
-                // then fall through to process this character normally below.
+                // Any other character ends the (unbraced) variable name: resolve
+                // it now, then fall through to process this character normally.
                 FlushVariable();
             }
 
             // Backslash escaping handling
-            if (!inSingleQuotes &&
-                !inDoubleQuotes &&
-                c == '\\')
+            if (!inSingleQuotes && !inDoubleQuotes && c == '\\')
             {
                 if (i + 1 < input.Length)
                 {
@@ -945,10 +970,7 @@ class Program
                 {
                     char next = input[i + 1];
 
-                    if (next == '"' ||
-                        next == '\\' ||
-                        next == '$' ||
-                        next == '`')
+                    if (next == '"' || next == '\\' || next == '$' || next == '`')
                     {
                         current.Append(next);
                         i++;
@@ -972,11 +994,9 @@ class Program
                 continue;
             }
 
-            if (!inSingleQuotes &&
-                !inDoubleQuotes &&
-                char.IsWhiteSpace(c))
+            if (!inSingleQuotes && !inDoubleQuotes && char.IsWhiteSpace(c))
             {
-                 if (current.Length > 0)
+                if (current.Length > 0)
                 {
                     args.Add(current.ToString());
                     current.Clear();
@@ -989,7 +1009,8 @@ class Program
         }
 
         // Flush a variable that was still being read when the input ended
-        // (e.g. a command line ending in "$Foo" with nothing after it).
+        // (e.g. a command line ending in "$Foo" or an unterminated "${Foo"
+        // with nothing after it).
         FlushVariable();
 
         if (current.Length > 0)
