@@ -204,8 +204,14 @@ class Program
 
 				if(command.Equals("history"))
                 {
-                    // List all commands in history
-                    for (int i = 0; i < historyList.Count; i++)
+                    string[] historyArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+					int numEntriesToShow = historyList.Count; // Default to showing all entries
+                    if (historyArgs.Length > 1)
+					{
+                        numEntriesToShow = int.Parse(historyArgs[1]);
+                    }
+					
+                    for (int i = historyList.Count - numEntriesToShow; i < historyList.Count; i++)
                     {
                         Console.WriteLine($"{i + 1} {historyList[i]}");
                     }
