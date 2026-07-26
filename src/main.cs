@@ -5,7 +5,7 @@ using System.Text;
 class Program
 {
     // Path used to restore the terminal to its original settings on exit.
-    private static string _savedTtySettings = string.Empty;
+    private static string _SavedTtySettings = string.Empty;
 
     // Returns the set of builtin commands that can meaningfully appear inside
     // a pipeline (i.e. ones that produce output rather than only side effects).
@@ -15,6 +15,8 @@ class Program
 
     private static List<string> _HistoryList = new List<string>();
     private static string _HistoryPath;
+
+    private static readonly Dictionary<string, string> _Variables = [];
 
     static void Main()
     {
@@ -305,6 +307,27 @@ class Program
                     continue;
                 }
 
+                if(command.StartsWith("declare"))
+                {
+                    string[] declareArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    if (declareArgs.Length > 1)
+                    {
+                        if (declareArgs[1].Equals("-p"))
+                        {
+                            string name = declareArgs[2];
+                            if(_Variables.TryGetValue(name, out var value))
+                            {
+                                Console.WriteLine($"declare -- {name}=\"{value}\"");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"declare: {name}: not found");
+                            }
+                        }
+                    }
+                    continue;
+                }
+
                 if (command.Equals("exit"))
                 {
                     if (!string.IsNullOrEmpty(_HistoryPath))
@@ -380,16 +403,16 @@ class Program
     // to avoid every typed line being displayed twice.
     private static void _EnableRawTerminalMode()
     {
-        _savedTtySettings = _RunSttyCommand("-g");
+        _SavedTtySettings = _RunSttyCommand("-g");
         _RunSttyCommand("-echo -icanon min 1 time 0");
     }
 
     // Restore the terminal settings that were active before we changed them.
     private static void _RestoreTerminalMode()
     {
-        if (!string.IsNullOrEmpty(_savedTtySettings))
+        if (!string.IsNullOrEmpty(_SavedTtySettings))
         {
-            _RunSttyCommand(_savedTtySettings);
+            _RunSttyCommand(_SavedTtySettings);
         }
     }
 
