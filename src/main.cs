@@ -332,7 +332,14 @@ class Program
                             //Store variable
                             string name = declareArgs[1].Split('=')[0];
                             string value = declareArgs[1].Split('=')[1];
-                            _Variables[name] = value;
+                            if (_IsVariableNameValid(name))
+                            {                           
+                                _Variables[name] = value;
+                            }
+                            else
+                            {
+                                Console.WriteLine($"declare: `{name}={value}': not a valid identifier");
+                            }
                             continue;
                         }
 
@@ -407,6 +414,29 @@ class Program
         {
             _RestoreTerminalMode();
         }
+    }
+
+    /// <summary>
+    /// Validates a variable name according to shell variable naming rules.
+    /// </summary>
+    /// <param name="variableName"></param>
+    /// <returns>True if the name is valid, false otherwise</returns>
+    private static bool _IsVariableNameValid(string variableName)
+    {
+       if(!variableName.StartsWith("_") && !char.IsLetter(variableName[0]))
+        {
+            return false;
+        }
+
+        foreach (char c in variableName)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '_')
+            {
+                return false;
+            }
+        }
+        return true;
+
     }
 
     // Disable canonical mode and local echo on the controlling terminal.
