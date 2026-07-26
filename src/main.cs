@@ -267,6 +267,16 @@ class Program
                         continue;
                     }
 
+                    if (historyArgs.Length > 1 && historyArgs[1].Equals("-w"))
+                    {
+                        _HistoryPath = historyArgs[2];
+                        File.WriteAllLines(_HistoryPath, _HistoryList);
+
+                        continue;
+                    }
+
+                   
+
                     for (int i = _HistoryList.Count - numEntriesToShow; i < _HistoryList.Count; i++)
                     {
                         Console.WriteLine($"{i + 1} {_HistoryList[i]}");
