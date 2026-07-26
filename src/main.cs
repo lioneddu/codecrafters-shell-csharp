@@ -245,7 +245,7 @@ class Program
                 {
                     string[] historyArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     int numEntriesToShow = _HistoryList.Count; // Default to showing all entries
-                    if (historyArgs.Length > 1 && !historyArgs[1].Equals("-r"))
+                    if (historyArgs.Length > 1 && !historyArgs[1].Equals("-r") && !historyArgs[1].Equals("-w"))
                     {
                         numEntriesToShow = int.Parse(historyArgs[1]);
                     }
