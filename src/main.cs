@@ -51,9 +51,10 @@ class Program
 
 				Console.Write("$ ");
 
-				string command = _ReadCommandLine(allCommands, customCompletions);
+                _HistoryList.Add(command);
 
-				_HistoryList.Add(command);
+                string command = _ReadCommandLine(allCommands, customCompletions);
+
 
 				// Detect a trailing '&' marking this command to run in the background.
 				// The shell must not wait for it to finish before showing the next prompt.
@@ -393,7 +394,8 @@ class Program
                     buffer.Clear();
 					buffer.Append(_HistoryList[_HistoryPointer]);
 				}
-			}
+				continue;
+            }
 
             if (key.Key == ConsoleKey.DownArrow)
             {
@@ -403,6 +405,7 @@ class Program
                     buffer.Clear();
                     buffer.Append(_HistoryList[_HistoryPointer]);
                 }
+				continue;	
             }
 
             if (key.Key == ConsoleKey.Tab) {
