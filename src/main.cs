@@ -333,7 +333,7 @@ class Program
                             string name = declareArgs[1].Split('=')[0];
                             string value = declareArgs[1].Split('=')[1];
                             if (_IsVariableNameValid(name))
-                            {                           
+                            {
                                 _Variables[name] = value;
                             }
                             else
@@ -423,7 +423,7 @@ class Program
     /// <returns>True if the name is valid, false otherwise</returns>
     private static bool _IsVariableNameValid(string variableName)
     {
-       if(!variableName.StartsWith("_") && !char.IsLetter(variableName[0]))
+        if (!variableName.StartsWith("_") && !char.IsLetter(variableName[0]))
         {
             return false;
         }
@@ -875,20 +875,31 @@ class Program
     {
         var args = new List<string>();
         var current = new StringBuilder();
+        var variableName = new StringBuilder();
 
         bool inSingleQuotes = false;
         bool inDoubleQuotes = false;
-        bool isVariable = input.StartsWith("$");
-
-        if (isVariable)
-        {
-            args.Append(_Variables.TryGetValue(input.Substring(1), out var value) ? value : string.Empty);
-            return args;
-        }
+        bool isVariable = false;
 
         for (int i = 0; i < input.Length; i++)
         {
             char c = input[i];
+
+            if (!inSingleQuotes &&
+                !inDoubleQuotes &&
+                c == '$')
+            {
+                isVariable = true;
+                continue;
+            }
+
+            if (!inSingleQuotes &&
+                !inDoubleQuotes &&
+                isVariable)
+            {
+                variableName.Append(c);
+                continue;
+            }
 
             // Backslash escaping handling
             if (!inSingleQuotes &&
@@ -940,7 +951,28 @@ class Program
                 !inDoubleQuotes &&
                 char.IsWhiteSpace(c))
             {
-                if (current.Length > 0)
+                if (isVariable)
+                {
+
+                    if (_Variables.TryGetValue(variableName.ToString(), out var value))
+                    {
+                        if (current.Length > 0)
+                        {
+                            args.Add(current.ToString() + value);
+                        }
+                        else
+                        {
+                            args.Add(value.ToString());
+                        }
+                    }
+                    else
+                    {
+                        args.Add(string.Empty);
+                    }
+                    isVariable = false;
+                    variableName.Clear();
+                }
+                else if (current.Length > 0)
                 {
                     args.Add(current.ToString());
                     current.Clear();
