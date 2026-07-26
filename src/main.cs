@@ -51,14 +51,11 @@ class Program
 
 				Console.Write("$ ");
 
-                _HistoryList.Add(command);
-
                 string command = _ReadCommandLine(allCommands, customCompletions);
 
-
-				// Detect a trailing '&' marking this command to run in the background.
-				// The shell must not wait for it to finish before showing the next prompt.
-				bool isBackground = false;
+                // Detect a trailing '&' marking this command to run in the background.
+                // The shell must not wait for it to finish before showing the next prompt.
+                bool isBackground = false;
 				string trimmedCommand = command.TrimEnd();
 
 				if (trimmedCommand.EndsWith("&")) {
@@ -374,7 +371,8 @@ class Program
 
 			if (key.Key == ConsoleKey.Enter) {
 				Console.WriteLine();
-				return buffer.ToString();
+                _HistoryList.Add(buffer.ToString());
+                return buffer.ToString();
 			}
 
 			if (key.Key == ConsoleKey.Backspace) {
