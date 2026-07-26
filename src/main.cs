@@ -881,6 +881,25 @@ class Program
         bool inDoubleQuotes = false;
         bool isVariable = false;
 
+        // Resolves the variable name collected so far (if any) and appends its
+        // value to the word currently being built. Called whenever a character
+        // that cannot be part of a variable name is encountered (whitespace,
+        // quotes, another '$', or end of input). An unset variable expands to
+        // nothing, matching bash behavior.
+        void FlushVariable()
+        {
+            if (!isVariable)
+                return;
+
+            if (_Variables.TryGetValue(variableName.ToString(), out var value))
+            {
+                current.Append(value);
+            }
+
+            isVariable = false;
+            variableName.Clear();
+        }
+
         for (int i = 0; i < input.Length; i++)
         {
             char c = input[i];
@@ -889,16 +908,22 @@ class Program
                 !inDoubleQuotes &&
                 c == '$')
             {
+                FlushVariable(); // in case a previous variable ended right at this '$'
                 isVariable = true;
                 continue;
             }
 
-            if (!inSingleQuotes &&
-                !inDoubleQuotes &&
-                isVariable)
+            if (isVariable)
             {
-                variableName.Append(c);
-                continue;
+                if (char.IsLetterOrDigit(c) || c == '_')
+                {
+                    variableName.Append(c);
+                    continue;
+                }
+
+                // Any other character ends the variable name: resolve it now,
+                // then fall through to process this character normally below.
+                FlushVariable();
             }
 
             // Backslash escaping handling
@@ -951,28 +976,7 @@ class Program
                 !inDoubleQuotes &&
                 char.IsWhiteSpace(c))
             {
-                if (isVariable)
-                {
-
-                    if (_Variables.TryGetValue(variableName.ToString(), out var value))
-                    {
-                        if (current.Length > 0)
-                        {
-                            args.Add(current.ToString() + value);
-                        }
-                        else
-                        {
-                            args.Add(value.ToString());
-                        }
-                    }
-                    else
-                    {
-                        args.Add(string.Empty);
-                    }
-                    isVariable = false;
-                    variableName.Clear();
-                }
-                else if (current.Length > 0)
+                 if (current.Length > 0)
                 {
                     args.Add(current.ToString());
                     current.Clear();
@@ -983,6 +987,10 @@ class Program
 
             current.Append(c);
         }
+
+        // Flush a variable that was still being read when the input ended
+        // (e.g. a command line ending in "$Foo" with nothing after it).
+        FlushVariable();
 
         if (current.Length > 0)
         {
