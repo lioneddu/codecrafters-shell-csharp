@@ -282,7 +282,7 @@ class Program
                     {
                         _HistoryPath = historyArgs[2];
                         File.AppendAllLines(_HistoryPath, _HistoryList);
-
+                        _HistoryList.Clear();
                         continue;
                     }
 
