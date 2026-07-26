@@ -26,7 +26,7 @@ class Program
         {
             _HistoryPath ??= Environment.GetEnvironmentVariable("HISTFILE");
 
-            if(File.Exists(_HistoryPath))
+            if (File.Exists(_HistoryPath))
             {
                 File.ReadAllLines(_HistoryPath).ToList().ForEach(line =>
                 {
@@ -259,8 +259,8 @@ class Program
                 {
                     string[] historyArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     int numEntriesToShow = _HistoryList.Count; // Default to showing all entries
-                    if (historyArgs.Length > 1 && 
-                        !historyArgs[1].Equals("-r") && 
+                    if (historyArgs.Length > 1 &&
+                        !historyArgs[1].Equals("-r") &&
                         !historyArgs[1].Equals("-w") &&
                         !historyArgs[1].Equals("-a"))
                     {
@@ -307,15 +307,16 @@ class Program
                     continue;
                 }
 
-                if(command.StartsWith("declare"))
+                if (command.StartsWith("declare"))
                 {
                     string[] declareArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     if (declareArgs.Length > 1)
                     {
                         if (declareArgs[1].Equals("-p"))
                         {
+                            //Print variable
                             string name = declareArgs[2];
-                            if(_Variables.TryGetValue(name, out var value))
+                            if (_Variables.TryGetValue(name, out var value))
                             {
                                 Console.WriteLine($"declare -- {name}=\"{value}\"");
                             }
@@ -323,9 +324,20 @@ class Program
                             {
                                 Console.WriteLine($"declare: {name}: not found");
                             }
+
+                            continue;
                         }
+                        else
+                        {
+                            //Store variable
+                            string name = declareArgs[1].Split('=')[0];
+                            string value = declareArgs[1].Split('=')[1];
+                            _Variables[name] = value;
+                            continue;
+                        }
+
                     }
-                    continue;
+
                 }
 
                 if (command.Equals("exit"))
