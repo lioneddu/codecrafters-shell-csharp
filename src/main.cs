@@ -391,6 +391,7 @@ class Program
 					_HistoryPointer = _HistoryPointer <= 0 ? _HistoryList.Count - 1 : _HistoryPointer - 1;
                     buffer.Clear();
 					buffer.Append(_HistoryList[_HistoryPointer]);
+					Console.WriteLine(_HistoryList[_HistoryPointer]);
 				}
 				continue;
             }
@@ -402,6 +403,7 @@ class Program
                     _HistoryPointer = _HistoryPointer + 1;
                     buffer.Clear();
                     buffer.Append(_HistoryList[_HistoryPointer]);
+                    Console.WriteLine(_HistoryList[_HistoryPointer]);
                 }
 				continue;	
             }
