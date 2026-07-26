@@ -245,7 +245,10 @@ class Program
                 {
                     string[] historyArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     int numEntriesToShow = _HistoryList.Count; // Default to showing all entries
-                    if (historyArgs.Length > 1 && !historyArgs[1].Equals("-r") && !historyArgs[1].Equals("-w"))
+                    if (historyArgs.Length > 1 && 
+                        !historyArgs[1].Equals("-r") && 
+                        !historyArgs[1].Equals("-w") &&
+                        !historyArgs[1].Equals("-a"))
                     {
                         numEntriesToShow = int.Parse(historyArgs[1]);
                     }
@@ -275,7 +278,13 @@ class Program
                         continue;
                     }
 
-                   
+                    if (historyArgs.Length > 1 && historyArgs[1].Equals("-a"))
+                    {
+                        _HistoryPath = historyArgs[2];
+                        File.AppendAllLines(_HistoryPath, _HistoryList);
+
+                        continue;
+                    }
 
                     for (int i = _HistoryList.Count - numEntriesToShow; i < _HistoryList.Count; i++)
                     {
