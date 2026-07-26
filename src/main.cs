@@ -202,7 +202,7 @@ class Program
 					continue;
 				}
 
-				if(command.Equals("history"))
+				if(command.StartsWith("history"))
                 {
                     string[] historyArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 					int numEntriesToShow = historyList.Count; // Default to showing all entries
