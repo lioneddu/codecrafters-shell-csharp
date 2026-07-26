@@ -11,14 +11,18 @@ class Program
 	// a pipeline (i.e. ones that produce output rather than only side effects).
 	private static readonly HashSet<string> _pipelineCapableBuiltins = new() { "echo", "type", "pwd", "jobs" };
 
-	static void Main()
+	private static int _HistoryPointer = -1; // Pointer to track the current position in the history list
+
+    private static List<string> _HistoryList = new List<string>();
+
+    static void Main()
 	{
 		_EnableRawTerminalMode();
 
 		try {
 
 			string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete", "jobs", "history" };
-            List<string> historyList = new List<string>();
+            
 
             Dictionary<string, string> customCompletions = new();
 
@@ -49,7 +53,7 @@ class Program
 
 				string command = _ReadCommandLine(allCommands, customCompletions);
 
-				historyList.Add(command);
+				_HistoryList.Add(command);
 
 				// Detect a trailing '&' marking this command to run in the background.
 				// The shell must not wait for it to finish before showing the next prompt.
@@ -205,15 +209,15 @@ class Program
 				if(command.StartsWith("history"))
                 {
                     string[] historyArgs = command.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-					int numEntriesToShow = historyList.Count; // Default to showing all entries
+					int numEntriesToShow = _HistoryList.Count; // Default to showing all entries
                     if (historyArgs.Length > 1)
 					{
                         numEntriesToShow = int.Parse(historyArgs[1]);
                     }
 					
-                    for (int i = historyList.Count - numEntriesToShow; i < historyList.Count; i++)
+                    for (int i = _HistoryList.Count - numEntriesToShow; i < _HistoryList.Count; i++)
                     {
-                        Console.WriteLine($"{i + 1} {historyList[i]}");
+                        Console.WriteLine($"{i + 1} {_HistoryList[i]}");
                     }
                     continue;
                 }
@@ -382,7 +386,26 @@ class Program
 				continue;
 			}
 
-			if (key.Key == ConsoleKey.Tab) {
+			if(key.Key == ConsoleKey.UpArrow)
+			{
+				if (_HistoryList.Count > 0) {
+					_HistoryPointer = _HistoryPointer <= 0 ? _HistoryList.Count - 1 : _HistoryPointer - 1;
+                    buffer.Clear();
+					buffer.Append(_HistoryList[_HistoryPointer]);
+				}
+			}
+
+            if (key.Key == ConsoleKey.DownArrow)
+            {
+                if (_HistoryList.Count > 0 && _HistoryPointer < _HistoryList.Count - 1)
+                {
+                    _HistoryPointer = _HistoryPointer + 1;
+                    buffer.Clear();
+                    buffer.Append(_HistoryList[_HistoryPointer]);
+                }
+            }
+
+            if (key.Key == ConsoleKey.Tab) {
 				string line = buffer.ToString();
 				int lastSpace = line.LastIndexOf(' ');
 
