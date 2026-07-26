@@ -878,6 +878,13 @@ class Program
 
         bool inSingleQuotes = false;
         bool inDoubleQuotes = false;
+        bool isVariable = input.StartsWith("$");
+
+        if (isVariable)
+        {
+            args.Append(_Variables.TryGetValue(input.Substring(1), out var value) ? value : string.Empty);
+            return args;
+        }
 
         for (int i = 0; i < input.Length; i++)
         {
