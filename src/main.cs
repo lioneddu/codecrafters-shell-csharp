@@ -270,8 +270,8 @@ class Program
 				else {
 					_WriteOutput(error, stderrMode, errorFilename);
 				}
-
-			}
+                _HistoryPointer = -1;
+            }
 
 		}
 		finally {
@@ -385,27 +385,29 @@ class Program
 				continue;
 			}
 
-			if(key.Key == ConsoleKey.UpArrow)
-			{
-				if (_HistoryList.Count > 0) {
-					_HistoryPointer = _HistoryPointer <= 0 ? _HistoryList.Count - 1 : _HistoryPointer - 1;
-                    buffer.Clear();
-					buffer.Append(_HistoryList[_HistoryPointer]);
-					Console.WriteLine(_HistoryList[_HistoryPointer]);
-				}
-				continue;
+            if (key.Key == ConsoleKey.UpArrow)
+            {
+                if (_HistoryList.Count > 0)
+                {
+                    _HistoryPointer = _HistoryPointer <= 0 ? _HistoryList.Count - 1 : _HistoryPointer - 1;
+                    _RedrawInputLine(buffer, _HistoryList[_HistoryPointer]);
+                }
+                continue;
             }
 
             if (key.Key == ConsoleKey.DownArrow)
             {
                 if (_HistoryList.Count > 0 && _HistoryPointer < _HistoryList.Count - 1)
                 {
-                    _HistoryPointer = _HistoryPointer + 1;
-                    buffer.Clear();
-                    buffer.Append(_HistoryList[_HistoryPointer]);
-                    Console.WriteLine(_HistoryList[_HistoryPointer]);
+                    _HistoryPointer++;
+                    _RedrawInputLine(buffer, _HistoryList[_HistoryPointer]);
                 }
-				continue;	
+                else if (_HistoryList.Count > 0  && _HistoryPointer == _HistoryList.Count - 1)
+                {
+                    _HistoryPointer = _HistoryList.Count; // "beyond" the list = empty line
+                    _RedrawInputLine(buffer, string.Empty);
+                }
+                continue;
             }
 
             if (key.Key == ConsoleKey.Tab) {
@@ -547,7 +549,22 @@ class Program
 		}
 	}
 
-	private static void Complete(List<string> matches,
+    // Clears the current input line on screen and redraws it with the given text,
+    // keeping the cursor on the same terminal line (no newline is emitted).
+    private static void _RedrawInputLine(StringBuilder buffer, string newContent)
+    {
+        // \r moves cursor to column 0, then we overwrite with spaces to erase
+        // whatever was there before (prompt + old buffer length).
+        int oldVisibleLength = 2 + buffer.Length; // "$ " + old content
+        Console.Write("\r" + new string(' ', oldVisibleLength) + "\r");
+
+        buffer.Clear();
+        buffer.Append(newContent);
+
+        Console.Write("$ " + newContent);
+    }
+
+    private static void Complete(List<string> matches,
 									string prefix,
 									string searchDirectory,
 									StringBuilder buffer,
