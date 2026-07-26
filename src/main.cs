@@ -22,6 +22,18 @@ class Program
 
         try
         {
+            _HistoryPath ??= Environment.GetEnvironmentVariable("HISTFILE");
+
+            if(File.Exists(_HistoryPath))
+            {
+                File.ReadAllLines(_HistoryPath).ToList().ForEach(line =>
+                {
+                    if (!string.IsNullOrEmpty(line))
+                    {
+                        _HistoryList.Add(line);
+                    }
+                });
+            }
 
             string[] builtInCommands = { "echo", "exit", "type", "pwd", "cd", "complete", "jobs", "history" };
 
