@@ -1,34 +1,53 @@
+# POSIX-like shell in C#
+
 [![progress-banner](https://backend.codecrafters.io/progress/shell/2723d535-fda9-4607-84d1-555119aa8adf)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+![.NET 9](https://img.shields.io/badge/9.0-512BD4?logo=dotnet&logoColor=white)
 
-This is a starting point for C# solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+An interactive shell written from scratch in C#: it parses command lines, runs builtins and external programs, connects them with pipes and redirections, and manages background jobs.
+Built as part of the [CodeCrafters "Build Your Own Shell"](https://app.codecrafters.io/courses/shell/overview) challenge.
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+## Features
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+| Area | Supported |
+|---|---|
+| Builtins | `echo`, `exit`, `type`, `pwd`, `cd` (absolute, relative, `~`), `history`, `jobs`, `declare`, `complete` |
+| External programs | Lookup through `PATH`, argument passing, `command not found` handling |
+| Quoting & expansion | Single quotes, double quotes, backslash escapes, `$VAR` and `${VAR}` expansion |
+| Pipelines | `cmd1 \| cmd2 \| cmd3`, mixing builtins and external programs |
+| Redirection | `>`, `1>`, `>>`, `1>>`, `2>`, `2>>` |
+| Background jobs | `cmd &`, job IDs, `jobs`, completion notices (`Done`) |
+| History | In-memory history, `history -r / -w / -a`, persistence through `HISTFILE` |
+| Line editing | Raw terminal mode, Tab completion for builtins and executables (longest common prefix, candidate list on double Tab), custom completions with `complete -C` |
 
-# Passing the first stage
+## How it works
 
-The entry point for your `shell` implementation is in `src/main.cs`. Study and
-uncomment the relevant code, then run the command below to execute the tests on
-our servers:
-
-```sh
-codecrafters submit
+```
+read line  →  tokenize (quotes, escapes, variables)  →  split pipeline stages
+          →  resolve each stage (builtin or PATH lookup)  →  wire stdin/stdout + redirections
+          →  run in foreground or as a background job
 ```
 
-Time to move on to the next stage!
+- **Line editor**: the terminal is switched to raw mode with `stty`, so the shell reads one key at a time and can handle Tab completion and redraw the prompt itself.
+- **Tokenizer**: a single-pass state machine that tracks whether it is inside single or double quotes, which escapes are valid in each context, and when a `$` starts a variable.
+- **Pipelines**: external stages are started as `Process` instances and their streams are connected; builtins inside a pipeline have their output captured and forwarded to the next stage.
+- **Background jobs**: a `BackgroundJobManager` assigns job IDs, tracks running processes and reports finished ones before the next prompt, like bash does.
 
-# Stage 2 & beyond
+## Running locally
 
-Note: This section is for stages 2 and beyond.
+Requires the [.NET 9 SDK](https://dotnet.microsoft.com/download) and a Unix-like terminal (Linux, macOS or WSL): raw mode relies on `stty`.
 
-1. Ensure you have `dotnet (9.0)` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main.cs`.
-1. Run `codecrafters submit` to submit your solution to CodeCrafters. Test
-   output will be streamed to your terminal.
+```sh
+./your_program.sh
+$ echo "hello $USER" | tr a-z A-Z
+$ ls -la > files.txt
+$ sleep 5 &
+$ jobs
+```
+
+## What I learned
+- How a shell reads, parses, and runs commands (it’s not magic!)
+- What a REPL is and how it works under the hood
+- How commands like echo run, vs. external ones (like cursor)
+- What $PATH means and its role in identifying executable files
+- How running commands require spawning OS processes and exits
+- How a shell actually parses quotes and escapes (the rules are subtler than they look)
